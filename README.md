@@ -1,0 +1,93 @@
+# AI PM pipeline
+
+An AI pipeline that does project-management work for a Scrum game project (an endless runner). A client describes a new feature in a chat UI, and the pipeline:
+
+1. asks a short questionnaire with predefined answers;
+2. analyzes and categorizes the requirements, conflicts, dependencies, assumptions and constraints;
+3. estimates effort, release forecast, budget, business value/ROI and risks;
+4. publishes the PM documents to Confluence;
+5. shows the client a short presentation with charts;
+6. after approval, creates the Epic, user stories, acceptance criteria and dependencies in Jira for Product Owner review.
+
+It also emails the team before sprint events. Everything runs locally with Docker Compose, and all data is kept in PostgreSQL.
+
+> **Status:** Phase 0 (foundations). The server starts, migrates the database and reports the health of every dependency. The pipeline itself arrives in the next phases.
+
+## Prerequisites
+
+- Docker Desktop
+- Node.js 24 (only for development outside Docker)
+- An Atlassian Cloud site (the free plan is fine) with:
+  - a **company-managed Scrum** Jira project (the project sidebar says "company-managed project"; create one with _Projects → Create project → Scrum → company-managed_ if needed);
+  - a Confluence space;
+  - a classic **API token** from <https://id.atlassian.com/manage-profile/security/api-tokens> ("Create API token", not "with scopes"). Tokens expire after at most a year.
+- A **Claude subscription** (Pro or Max) and [Claude Code](https://code.claude.com) installed on your machine. The pipeline calls Claude through the Claude Code CLI on your subscription; there is no Anthropic API key. Pipeline runs share your subscription's usage limits with anything else you run in Claude Code.
+
+## Quick start
+
+1. Create your configuration:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Fill in the `ATLASSIAN_*` values, `JIRA_PROJECT_KEY`, `CONFLUENCE_SPACE_KEY`, and a `POSTGRES_PASSWORD`. Leave `ATLASSIAN_WRITE_MODE=dry-run` until you want real writes.
+
+   For Claude, create a long-lived login token for the Docker container. It opens a browser to sign in with your Claude account:
+
+   ```bash
+   claude setup-token
+   ```
+
+   Paste the printed token into `.env` as `CLAUDE_CODE_OAUTH_TOKEN`.
+
+2. Start the stack:
+
+   ```bash
+   docker compose up --build -d
+   ```
+
+3. Open <http://localhost:3000>. The status page checks PostgreSQL, Jira (sign-in and the Scrum project), Confluence, the Claude Code CLI login and email. "Not configured" means a value is missing in `.env`; the detail column says which.
+
+The JSON report is at <http://localhost:3000/api/health>. Emails sent by the app appear in Mailpit at <http://localhost:8025>.
+
+After editing `.env`, recreate the app container so it picks up the new values:
+
+```bash
+docker compose up -d app
+```
+
+## Development
+
+```bash
+npm install
+docker compose up -d postgres mailpit   # database and mail inbox only
+npm run dev                             # API on :3000 (tsx watch), UI on :5173 (Vite)
+```
+
+| Command                           | What it does                                                                            |
+| --------------------------------- | --------------------------------------------------------------------------------------- |
+| `npm test`                        | Unit tests (Vitest)                                                                     |
+| `npm run typecheck`               | TypeScript across all workspaces                                                        |
+| `npm run lint` / `npm run format` | ESLint / Prettier                                                                       |
+| `npm run build`                   | Build shared, server and web                                                            |
+| `npm run db:generate`             | Create a migration after changing `apps/server/src/db/schema.ts`                        |
+| `npm run db:migrate`              | Apply migrations without starting the server (the server also applies them at start-up) |
+
+## Structure
+
+```text
+apps/server       Node.js + TypeScript API, harness, integrations (Fastify, Drizzle, PostgreSQL)
+apps/web          React + Vite UI
+packages/shared   zod schemas and types shared by server and web
+agents/           agent definitions (one Markdown file per role)
+skills/           knowledge packages used by the agents
+config/           YAML settings: sprint cadence, rates, feasibility rules
+```
+
+## Configuration notes
+
+- **Database.** The app builds its connection from the `POSTGRES_*` values, so the password lives in one place. Inside Docker it reaches the `postgres` service; on your machine it uses `localhost:${POSTGRES_PORT}`.
+- **Email.** With `SMTP_HOST` empty, every email goes to Mailpit. Set your provider's host, port, user and password to send real email.
+- **Atlassian.** The pipeline talks to the Jira and Confluence REST APIs with Basic auth (email + API token). With `ATLASSIAN_WRITE_MODE=dry-run`, writes are logged but not sent.
+- **Claude.** Each agent call runs `claude -p` (print mode) with no tools enabled and a JSON schema for the answer. The Docker image ships its own pinned copy of Claude Code, signed in with `CLAUDE_CODE_OAUTH_TOKEN`. When you run the server on your machine (`npm run dev`), it uses your existing Claude Code login; set `CLAUDE_CLI_PATH` if `claude` is not on your PATH.

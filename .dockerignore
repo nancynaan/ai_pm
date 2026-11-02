@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/coverage
+.git
+.claude
+
+# Credentials are passed at runtime by Docker Compose, never baked into the image
+.env
+.env.*
