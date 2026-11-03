@@ -1,0 +1,11 @@
+items:
+  - Code reviewed by at least one other developer and merged to main
+  - Unit tests for game logic pass in CI, with no new critical static-analysis warnings
+  - Acceptance criteria verified by QA on one low-end Android, one mid-range Android and one iPhone
+  - Frame time within budget (60 FPS on mid-range, at least 30 FPS on the low-end reference device)
+  - No new crash in the latest QA build
+  - Analytics events for the story implemented and verified
+  - All player-facing texts externalized for localization
+  - Save data stays compatible, or a tested migration is included
+  - Product Owner accepted the story in the Sprint Review
+  - Confluence pages or code comments updated where behaviour changed

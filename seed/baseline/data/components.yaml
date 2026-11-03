@@ -1,0 +1,94 @@
+# Architecture component map. Each component becomes a Jira component. "sensitivity" drives the
+# change-magnitude rule: core = engine-level change, feature = new behaviour on existing systems,
+# cosmetic = looks only.
+components:
+  - name: Physics & Movement
+    responsibility: Kinematic character controller, lane switching, jump and slide arcs, collisions, touch input
+    technology: Custom C# controller, fixed 60 Hz timestep
+    sensitivity: core
+    depends_on: [Game Loop]
+    owner: Lucas Moreau
+  - name: Game Loop
+    responsibility: Run lifecycle, scoring, speed curve, revive flow, run results
+    technology: C# state machine
+    sensitivity: core
+    depends_on: [Physics & Movement, Level Generator]
+    owner: Priya Nair
+  - name: Level Generator
+    responsibility: Procedural assembly of track chunks, obstacle patterns, difficulty curve
+    technology: C#, chunk library in ScriptableObjects
+    sensitivity: core
+    depends_on: [Game Loop]
+    owner: Priya Nair
+  - name: Save System
+    responsibility: Local save of profile, wallet and unlocks; format versioning and migration
+    technology: Encrypted JSON on device
+    sensitivity: core
+    depends_on: []
+    owner: Priya Nair
+  - name: Rendering & VFX
+    responsibility: Neon shaders, particles, lighting, quality tiers, frame-time budget
+    technology: Unity URP
+    sensitivity: feature
+    depends_on: []
+    owner: Lucas Moreau
+  - name: UI & HUD
+    responsibility: Menus, HUD, store screens, results screen, localization of texts
+    technology: Unity UI Toolkit
+    sensitivity: cosmetic
+    depends_on: [Economy & Store]
+    owner: Sofia Alvarez
+  - name: Characters & Skins
+    responsibility: Character models, skin catalog, unlock rules
+    technology: Addressable asset bundles
+    sensitivity: cosmetic
+    depends_on: [Economy & Store]
+    owner: Sofia Alvarez
+  - name: Economy & Store
+    responsibility: Coin and gem wallet, prices, offers, in-app purchases
+    technology: Unity IAP, server-side receipt validation
+    sensitivity: feature
+    depends_on: [Backend, Save System]
+    owner: Tomasz Kowalski
+  - name: Missions & Progression
+    responsibility: Daily missions, player levels, XP and rewards
+    technology: C#, mission definitions in remote config
+    sensitivity: feature
+    depends_on: [Economy & Store, Live-ops]
+    owner: Priya Nair
+  - name: Ads
+    responsibility: Rewarded and interstitial ads, frequency caps
+    technology: Ad mediation SDK
+    sensitivity: feature
+    depends_on: [Analytics]
+    owner: Tomasz Kowalski
+  - name: Analytics
+    responsibility: Event tracking, funnels, A/B test assignment
+    technology: Analytics SDK, event schema in code
+    sensitivity: feature
+    depends_on: []
+    owner: Tomasz Kowalski
+  - name: Backend
+    responsibility: Player profile, receipt validation, remote config delivery
+    technology: Node.js services on managed cloud, PostgreSQL
+    sensitivity: feature
+    depends_on: []
+    owner: Tomasz Kowalski
+  - name: Live-ops
+    responsibility: Event calendar, timed modifiers, remote tuning of economy and difficulty
+    technology: Remote config + event definitions served by the backend
+    sensitivity: feature
+    depends_on: [Backend]
+    owner: Tomasz Kowalski
+  - name: Audio
+    responsibility: Music, sound effects, mixing
+    technology: Unity audio mixer
+    sensitivity: cosmetic
+    depends_on: []
+    owner: Sofia Alvarez
+performance_budget:
+  - { metric: Frame rate on mid-range reference device, budget: 60 FPS (16.6 ms per frame) }
+  - { metric: Frame rate on low-end reference device (2 GB RAM Android), budget: at least 30 FPS }
+  - { metric: Memory on low-end device, budget: under 800 MB }
+  - { metric: Cold start to main menu, budget: under 5 s }
+  - { metric: Install size, budget: under 150 MB (currently 168 MB) }

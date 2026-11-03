@@ -1,0 +1,123 @@
+# Stakeholder Register. Emails use the reserved example.com domain; "team: true" marks the
+# Scrum Team members who receive sprint event reminders.
+stakeholders:
+  - {
+      name: Olivia Grant,
+      role: Sponsor,
+      organization: Acme Play Ltd.,
+      interest: 'Return on investment, launch date',
+      influence: high,
+      engagement: Supportive,
+      email: olivia.grant@example.com,
+      team: false,
+    }
+  - {
+      name: Ethan Brooks,
+      role: Client Product Director,
+      organization: Acme Play Ltd.,
+      interest: 'Feature ideas, player experience, KPIs',
+      influence: high,
+      engagement: Leading,
+      email: ethan.brooks@example.com,
+      team: false,
+    }
+  - {
+      name: Hannah Lee,
+      role: Marketing Lead,
+      organization: Acme Play Ltd.,
+      interest: 'Launch campaign, store presence, ad revenue',
+      influence: medium,
+      engagement: Supportive,
+      email: hannah.lee@example.com,
+      team: false,
+    }
+  - {
+      name: Maya Chen,
+      role: Product Owner,
+      organization: Delivery team,
+      interest: 'Backlog value and ordering',
+      influence: high,
+      engagement: Leading,
+      email: maya.chen@example.com,
+      team: true,
+    }
+  - {
+      name: Daniel Okafor,
+      role: Scrum Master,
+      organization: Delivery team,
+      interest: 'Team flow, impediments',
+      influence: medium,
+      engagement: Leading,
+      email: daniel.okafor@example.com,
+      team: true,
+    }
+  - {
+      name: Lucas Moreau,
+      role: Gameplay developer,
+      organization: Delivery team,
+      interest: 'Engine quality, performance',
+      influence: medium,
+      engagement: Supportive,
+      email: lucas.moreau@example.com,
+      team: true,
+    }
+  - {
+      name: Priya Nair,
+      role: Gameplay developer,
+      organization: Delivery team,
+      interest: 'Game loop, progression',
+      influence: medium,
+      engagement: Supportive,
+      email: priya.nair@example.com,
+      team: true,
+    }
+  - {
+      name: Tomasz Kowalski,
+      role: Backend developer,
+      organization: Delivery team,
+      interest: 'Backend stability, SDK integrations',
+      influence: medium,
+      engagement: Supportive,
+      email: tomasz.kowalski@example.com,
+      team: true,
+    }
+  - {
+      name: Sofia Alvarez,
+      role: UI/UX & 2D artist,
+      organization: Delivery team,
+      interest: 'Visual identity, usability',
+      influence: medium,
+      engagement: Supportive,
+      email: sofia.alvarez@example.com,
+      team: true,
+    }
+  - {
+      name: Ken Watanabe,
+      role: QA engineer,
+      organization: Delivery team,
+      interest: 'Release quality, device coverage',
+      influence: low,
+      engagement: Supportive,
+      email: ken.watanabe@example.com,
+      team: true,
+    }
+  - {
+      name: Ad mediation partner,
+      role: External partner,
+      organization: Ad network,
+      interest: 'Ad inventory, eCPM',
+      influence: medium,
+      engagement: Neutral,
+      email: partner-manager@example.com,
+      team: false,
+    }
+  - {
+      name: Players,
+      role: End users,
+      organization: Community,
+      interest: 'Fun, fairness, performance on their device',
+      influence: high,
+      engagement: Unaware,
+      email: community@example.com,
+      team: false,
+    }

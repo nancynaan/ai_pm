@@ -1,0 +1,14 @@
+# The demo project the AI PM pipeline works on. All names and numbers are fictional.
+name: Comet Run
+genre: Endless runner
+client: Acme Play Ltd.
+platforms: [iOS, Android]
+engine: Unity 6 LTS
+pitch: >-
+  A neon-lit endless runner across the rooftops of a futuristic city. Players dash, jump and
+  slide between three lanes, collect coins, unlock characters and compete in weekly events.
+# Delivery facts used by forecasts and the roadmap.
+kickoff: 2026-01-12
+current_sprint: 22
+soft_launch: 2026-09-14
+global_launch_target: 2027-02-15

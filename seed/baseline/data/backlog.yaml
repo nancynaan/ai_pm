@@ -1,0 +1,232 @@
+# Initial Product Backlog, created in Jira by the seed. Status: todo | in_progress | done.
+# Points are the team's Planning Poker estimates; done stories serve as reference stories.
+epics:
+  - id: EP-CORE
+    summary: Core runner gameplay
+    status: done
+    components: [Physics & Movement, Game Loop, Level Generator]
+    description: The three-lane run itself — movement, obstacles, speed curve and revive — shipped in the soft launch.
+  - id: EP-META
+    summary: Meta progression and economy
+    status: in_progress
+    components: [Economy & Store, Missions & Progression, Characters & Skins]
+    description: Long-term goals between runs — wallet, skins, missions, player levels and power-up upgrades.
+  - id: EP-MON
+    summary: 'Monetization: in-app purchases and rewarded ads'
+    status: in_progress
+    components: [Economy & Store, Ads]
+    description: Gem packs, rewarded ads and fair interstitial rules that reach the ARPDAU target without hurting retention.
+  - id: EP-LAUNCH
+    summary: Global launch readiness
+    status: in_progress
+    components: [Rendering & VFX, UI & HUD, Backend]
+    description: Everything the global launch needs — low-end performance, localization, install size, store assets and backend capacity.
+  - id: EP-LIVE
+    summary: Live-ops foundation
+    status: todo
+    components: [Live-ops, Backend]
+    description: Remote tuning, timed events and leaderboards for the first live-ops release (R3).
+
+stories:
+  - id: ST-01
+    epic: EP-CORE
+    summary: Lane switching with swipe gestures
+    story: As a player, I want to switch lanes with a swipe so that I can dodge obstacles quickly.
+    points: 5
+    components: [Physics & Movement]
+    status: done
+    acceptance:
+      - |
+        Scenario: Swipe right changes lane
+          Given the runner is in the middle lane
+          When I swipe right
+          Then the runner moves to the right lane within 150 ms
+  - id: ST-02
+    epic: EP-CORE
+    summary: Jump and slide with forgiving hitboxes
+    story: As a player, I want jump and slide to feel fair so that I blame myself, not the game, when I crash.
+    points: 5
+    components: [Physics & Movement]
+    status: done
+    acceptance:
+      - |
+        Scenario: Near miss is not a crash
+          Given an obstacle overlaps the runner's sprite by less than 10 %
+          When the runner passes it
+          Then the run continues
+  - id: ST-03
+    epic: EP-CORE
+    summary: Procedural chunk-based level generator
+    story: As a player, I want every run to look different so that the game stays fresh.
+    points: 8
+    components: [Level Generator]
+    status: done
+    acceptance:
+      - |
+        Scenario: No impossible patterns
+          Given 1,000 generated runs in the automated test
+          When each chunk sequence is validated
+          Then every sequence has at least one passable lane
+  - id: ST-04
+    epic: EP-CORE
+    summary: Speed curve and difficulty scaling
+    story: As a player, I want the run to get faster gradually so that the challenge grows with my skill.
+    points: 3
+    components: [Game Loop, Level Generator]
+    status: done
+  - id: ST-05
+    epic: EP-CORE
+    summary: Revive after a crash with gems or a rewarded ad
+    story: As a player, I want to continue a good run after crashing so that one mistake does not end it.
+    points: 5
+    components: [Game Loop, Ads]
+    status: done
+    acceptance:
+      - |
+        Scenario: Revive by rewarded ad
+          Given I crashed and have not revived in this run
+          When I watch a rewarded ad to the end
+          Then the run resumes with 3 seconds of invulnerability
+  - id: ST-06
+    epic: EP-META
+    summary: Coin and gem wallet with server sync
+    story: As a player, I want my coins and gems to be safe so that I never lose currency I earned or bought.
+    points: 5
+    components: [Economy & Store, Backend]
+    status: done
+  - id: ST-07
+    epic: EP-META
+    summary: Character skin catalog with unlocks
+    story: As a player, I want to unlock and choose character skins so that my runner looks the way I like.
+    points: 5
+    components: [Characters & Skins, UI & HUD]
+    status: done
+  - id: ST-08
+    epic: EP-META
+    summary: Daily missions with rewards
+    story: As a player, I want three new missions every day so that I have a reason to come back.
+    points: 8
+    components: [Missions & Progression]
+    status: in_progress
+    acceptance:
+      - |
+        Scenario: New missions at local midnight
+          Given I completed yesterday's missions
+          When the local date changes
+          Then I see three new missions with coin rewards
+  - id: ST-09
+    epic: EP-META
+    summary: Player levels and XP rewards
+    story: As a player, I want to level up from XP earned in runs so that I feel long-term progress.
+    points: 5
+    components: [Missions & Progression]
+    status: todo
+  - id: ST-10
+    epic: EP-META
+    summary: Power-up upgrades (magnet, shield, double coins)
+    story: As a player, I want to upgrade power-ups with coins so that my runs get stronger over time.
+    points: 5
+    components: [Economy & Store, Game Loop]
+    status: todo
+  - id: ST-11
+    epic: EP-MON
+    summary: Gem packs via in-app purchase with receipt validation
+    story: As a player, I want to buy gem packs safely so that I get what I paid for.
+    points: 8
+    components: [Economy & Store, Backend]
+    status: done
+    acceptance:
+      - |
+        Scenario: Fake receipt is rejected
+          Given a purchase receipt that the store cannot verify
+          When the client sends it to the backend
+          Then no gems are granted and the event is logged
+  - id: ST-12
+    epic: EP-MON
+    summary: Rewarded ad to double coins after a run
+    story: As a player, I want to double my run's coins by watching an ad so that I progress faster without paying.
+    points: 3
+    components: [Ads]
+    status: done
+  - id: ST-13
+    epic: EP-MON
+    summary: Interstitial ad cadence rules
+    story: As a player, I want ads not to interrupt my first runs so that I can enjoy the game before seeing ads.
+    points: 3
+    components: [Ads]
+    status: in_progress
+    acceptance:
+      - |
+        Scenario: No interstitial in the first session's first runs
+          Given I am in my first session
+          When I finish run 1 or run 2
+          Then no interstitial ad is shown
+  - id: ST-14
+    epic: EP-MON
+    summary: Starter pack offer for new players
+    story: As a new player, I want a one-time starter pack so that I get good value if I decide to pay.
+    points: 5
+    components: [Economy & Store, UI & HUD]
+    status: todo
+  - id: ST-15
+    epic: EP-LAUNCH
+    summary: Graphics quality tiers for low-end Android
+    story: As a player on a low-end phone, I want the game to run smoothly so that I can play without stutter.
+    points: 8
+    components: [Rendering & VFX]
+    status: in_progress
+    acceptance:
+      - |
+        Scenario: Low tier on 2 GB devices
+          Given a device with 2 GB of RAM
+          When the game starts for the first time
+          Then the low quality tier is selected and the run holds at least 30 FPS
+  - id: ST-16
+    epic: EP-LAUNCH
+    summary: Localize UI texts into 8 languages
+    story: As a player outside English-speaking markets, I want the game in my language so that I understand menus and offers.
+    points: 5
+    components: [UI & HUD]
+    status: todo
+  - id: ST-17
+    epic: EP-LAUNCH
+    summary: Reduce install size below 150 MB
+    story: As a player, I want a small download so that I can install the game on mobile data.
+    points: 5
+    components: [Rendering & VFX]
+    status: todo
+  - id: ST-18
+    epic: EP-LAUNCH
+    summary: Store listing assets and screenshots
+    story: As the marketing lead, I want localized store screenshots and a trailer so that the store page converts well.
+    points: 3
+    components: [UI & HUD]
+    status: todo
+  - id: ST-19
+    epic: EP-LAUNCH
+    summary: Load test the backend for 200k DAU
+    story: As the team, we want proof that the backend survives launch traffic so that players are not locked out on day one.
+    points: 5
+    components: [Backend]
+    status: todo
+  - id: ST-20
+    epic: EP-LIVE
+    summary: Remote config for economy tuning
+    story: As the product owner, I want to change prices and rewards without a release so that we can tune the economy quickly.
+    points: 5
+    components: [Live-ops, Backend]
+    status: todo
+  - id: ST-21
+    epic: EP-LIVE
+    summary: Event calendar with timed modifiers
+    story: As a player, I want limited-time events so that there is always something new to play for.
+    points: 8
+    components: [Live-ops, Game Loop]
+    status: todo
+  - id: ST-22
+    epic: EP-LIVE
+    summary: Weekly global leaderboards
+    story: As a competitive player, I want a weekly leaderboard so that I can compare my best run with others.
+    points: 8
+    components: [Backend, UI & HUD]
+    status: todo

@@ -11,6 +11,15 @@ export interface AtlassianHttpOptions {
   sleep?: (ms: number) => Promise<unknown>;
   maxRetries?: number;
   timeoutMs?: number;
+  /** Dry-run safety net: refuse every request that could change data on the site. */
+  readOnly?: boolean;
+}
+
+/** POST endpoints that only read. */
+const READ_ONLY_POSTS = new Set(['/rest/api/3/search/jql']);
+
+export class ReadOnlyViolation extends Error {
+  override name = 'ReadOnlyViolation';
 }
 
 export interface RequestOptions {
@@ -44,6 +53,9 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
   const authorization = `Basic ${Buffer.from(`${credentials.email}:${credentials.apiToken}`).toString('base64')}`;
 
   async function request<T>(method: string, path: string, { query, body }: RequestOptions = {}): Promise<T> {
+    if (options.readOnly && method !== 'GET' && !(method === 'POST' && READ_ONLY_POSTS.has(path))) {
+      throw new ReadOnlyViolation(`Blocked ${method} ${path}: Atlassian writes are in dry-run mode`);
+    }
     const url = new URL(baseUrl + path);
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined) url.searchParams.set(key, String(value));
@@ -59,7 +71,9 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (response.ok) {
-        return (response.status === 204 ? undefined : await response.json()) as T;
+        // Several write endpoints answer 200/201/204 with an empty body.
+        const text = await response.text();
+        return (text ? JSON.parse(text) : undefined) as T;
       }
       const retryable = response.status === 429 || response.status >= 500;
       if (retryable && attempt < maxRetries) {
@@ -75,6 +89,8 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
   }
 
   return {
+    siteUrl: baseUrl,
+    readOnly: options.readOnly ?? false,
     get: <T>(path: string, options?: Omit<RequestOptions, 'body'>) => request<T>('GET', path, options),
     post: <T>(path: string, options?: RequestOptions) => request<T>('POST', path, options),
     put: <T>(path: string, options?: RequestOptions) => request<T>('PUT', path, options),

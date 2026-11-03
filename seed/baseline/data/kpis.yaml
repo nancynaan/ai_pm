@@ -1,0 +1,20 @@
+# KPI baseline from the soft launch and the targets the Business Case commits to.
+source: Soft launch in Canada and Australia, 30-day average up to 2026-10-25
+metrics:
+  - { key: dau, name: Daily active users (DAU), unit: users, baseline: 12000, target: 150000 }
+  - { key: arpdau, name: Average revenue per DAU (ARPDAU), unit: usd, baseline: 0.06, target: 0.08 }
+  - { key: d1_retention, name: Day-1 retention, unit: ratio, baseline: 0.38, target: 0.42 }
+  - { key: d7_retention, name: Day-7 retention, unit: ratio, baseline: 0.14, target: 0.18 }
+  - { key: d30_retention, name: Day-30 retention, unit: ratio, baseline: 0.05, target: 0.07 }
+  - { key: payer_conversion, name: Payer conversion, unit: ratio, baseline: 0.018, target: 0.025 }
+  - { key: rewarded_views_per_dau, name: Rewarded ad views per DAU, unit: number, baseline: 2.1, target: 2.8 }
+  - { key: session_minutes, name: Average session length, unit: minutes, baseline: 7.5, target: 9 }
+  - { key: crash_free_sessions, name: Crash-free sessions, unit: ratio, baseline: 0.992, target: 0.995 }
+revenue_split: { iap: 0.55, ads: 0.45 }
+financials:
+  approved_budget_usd: 1348000
+  spent_to_date_usd: 862600
+  user_acquisition_budget_usd: 1500000 # funded by the client, outside the delivery budget
+  expected_year1_revenue_usd: 3100000
+  payback_months_after_launch: 7
+  discount_rate_annual: 0.12

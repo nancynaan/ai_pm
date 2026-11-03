@@ -1,0 +1,98 @@
+# Risk Register. Probability and impact on 1–5 scales; score = probability × impact.
+risks:
+  - id: R-01
+    title: Retention below target after global launch
+    cause: The meta loop is shallow (few long-term goals)
+    event: Day-7 retention stays under 15 % after launch
+    effect: Revenue about 30 % below the Business Case
+    category: Product
+    probability: 3
+    impact: 5
+    strategy: Mitigate
+    response: Ship missions, player levels and season events by R3; run retention A/B tests
+    owner: Maya Chen
+    status: open
+  - id: R-02
+    title: Poor performance on low-end Android devices
+    cause: Heavy neon shaders and particle effects
+    event: Frame rate drops below 30 FPS on 2 GB devices
+    effect: Bad store reviews and early churn in emerging markets
+    category: Technical
+    probability: 3
+    impact: 4
+    strategy: Mitigate
+    response: Graphics quality tiers; profile on the low-end reference device every sprint
+    owner: Lucas Moreau
+    status: open
+  - id: R-03
+    title: App store rejection of an update
+    cause: Changes in in-app purchase or ad policies
+    event: A release is rejected in review
+    effect: Launch or event slips by 1–2 weeks
+    category: External
+    probability: 2
+    impact: 4
+    strategy: Mitigate
+    response: Pre-submission policy checklist; submit 10 days before the target date
+    owner: Tomasz Kowalski
+    status: open
+  - id: R-04
+    title: Loss of a key developer
+    cause: Small team with single owners per component
+    event: A developer leaves or is unavailable for several sprints
+    effect: Velocity drops by about 20 % and knowledge is lost
+    category: Resource
+    probability: 2
+    impact: 4
+    strategy: Mitigate
+    response: Pair on core components; keep the Architecture Overview current
+    owner: Daniel Okafor
+    status: open
+  - id: R-05
+    title: Ad revenue below the model
+    cause: Falling eCPM or low rewarded-ad engagement
+    event: Ad revenue per DAU is 25 % under plan for two months
+    effect: Payback moves out by 2–3 months
+    category: Commercial
+    probability: 3
+    impact: 3
+    strategy: Mitigate
+    response: Tune the mediation waterfall; add more rewarded placements
+    owner: Hannah Lee
+    status: open
+  - id: R-06
+    title: Scope creep from new feature requests
+    cause: Frequent new ideas from the client during development
+    event: Unplanned work takes team capacity away from launch scope
+    effect: Global launch slips
+    category: Scope
+    probability: 4
+    impact: 3
+    strategy: Mitigate
+    response: Every new feature gets an impact assessment and is ordered by the PO before work starts
+    owner: Maya Chen
+    status: open
+  - id: R-07
+    title: Backend cannot handle the launch peak
+    cause: Services were sized for soft-launch traffic
+    event: Error rates or latency spike when featured by a store
+    effect: Lost purchases and bad first impressions
+    category: Technical
+    probability: 2
+    impact: 5
+    strategy: Mitigate
+    response: Load test at 200k DAU before launch; autoscaling rules
+    owner: Tomasz Kowalski
+    status: open
+  - id: R-08
+    title: Save data loss after an update
+    cause: Save format changes without migration
+    event: Players lose progress after updating
+    effect: Refund requests, churn and review bombing
+    category: Technical
+    probability: 2
+    impact: 5
+    strategy: Avoid
+    response: Versioned save schema with migration tests in CI
+    owner: Priya Nair
+    status: open

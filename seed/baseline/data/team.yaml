@@ -1,0 +1,20 @@
+# Team, rates and velocity. Feeds the Team & Velocity page, budgets and release forecasts.
+currency: USD
+sprint_length_weeks: 2
+hours_per_sprint: 80 # per full-time person
+capacity_share_new_epic: 0.5 # share of team capacity a new feature gets by default
+roles:
+  - { role: Product Owner, name: Maya Chen, fte: 1, rate: 75 }
+  - { role: Scrum Master, name: Daniel Okafor, fte: 1, rate: 70 }
+  - { role: Gameplay developer, name: Lucas Moreau, fte: 1, rate: 80 }
+  - { role: Gameplay developer, name: Priya Nair, fte: 1, rate: 80 }
+  - { role: Backend developer, name: Tomasz Kowalski, fte: 1, rate: 85 }
+  - { role: UI/UX & 2D artist, name: Sofia Alvarez, fte: 1, rate: 65 }
+  - { role: QA engineer (shared), name: Ken Watanabe, fte: 0.5, rate: 55 }
+velocity:
+  - { sprint: Sprint 16, committed: 30, completed: 28 }
+  - { sprint: Sprint 17, committed: 32, completed: 32 }
+  - { sprint: Sprint 18, committed: 31, completed: 30 }
+  - { sprint: Sprint 19, committed: 30, completed: 26 }
+  - { sprint: Sprint 20, committed: 33, completed: 34 }
+  - { sprint: Sprint 21, committed: 32, completed: 31 }

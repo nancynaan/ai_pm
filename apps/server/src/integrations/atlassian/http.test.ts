@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AtlassianError, createAtlassianHttp } from './http.js';
+import { AtlassianError, createAtlassianHttp, ReadOnlyViolation } from './http.js';
 
 const credentials = {
   siteUrl: 'https://demo.atlassian.net/',
@@ -58,5 +58,22 @@ describe('createAtlassianHttp', () => {
     expect((error as Error).message).toContain('Client must be authenticated');
     expect((error as Error).message).not.toContain('secret-token');
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks writes in read-only (dry-run) mode but allows reads and JQL search', async () => {
+    const fetch = vi.fn(async () => jsonResponse(200, { issues: [] }));
+    const http = createAtlassianHttp(credentials, { fetch, readOnly: true });
+
+    await http.get('/rest/api/3/myself');
+    await http.post('/rest/api/3/search/jql', { body: { jql: 'project = AIPM' } });
+    await expect(http.post('/rest/api/3/issue', { body: {} })).rejects.toThrow(ReadOnlyViolation);
+    await expect(http.put('/wiki/api/v2/pages/1', { body: {} })).rejects.toThrow(/dry-run/);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts empty success bodies from write endpoints', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const http = createAtlassianHttp(credentials, { fetch });
+    await expect(http.put('/rest/api/3/issue/AIPM-1', { body: {} })).resolves.toBeUndefined();
   });
 });

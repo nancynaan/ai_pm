@@ -57,6 +57,36 @@ After editing `.env`, recreate the app container so it picks up the new values:
 docker compose up -d app
 ```
 
+## Seeding the demo project
+
+The pipeline needs an existing project to work on. The seed creates one for a fictional endless runner, **Comet Run**, from the files in [seed/baseline](seed/baseline):
+
+- the custom field **AI estimate (SP)**, placed on the project's screens;
+- 14 Jira components (one per game component);
+- 5 epics and 22 stories with story points, acceptance criteria and statuses;
+- 12 Confluence pages: Business Case, Project Charter, Stakeholder Register, Assumption Log, Game Design Document, Definition of Done, Product Roadmap, Risk Register, Architecture Overview, Team & Velocity and Initial Product Backlog, under a "Comet Run: Project Baseline" page;
+- the baseline and a digest for the agents, in the database.
+
+First run it as a dry-run. It only reads from your site and prints what it would create or change:
+
+```bash
+docker compose exec app node apps/server/dist/baseline/cli.js
+```
+
+Then write it for real:
+
+```bash
+docker compose exec app node apps/server/dist/baseline/cli.js --live
+```
+
+Running it again is safe. Everything is matched to what exists (by sync log, issue label or page title), so nothing is duplicated, and unchanged content is not rewritten, so edits you make in Jira or Confluence survive. After editing baseline pages in Confluence, re-read them into the database:
+
+```bash
+docker compose exec app node apps/server/dist/baseline/cli.js --sync-only
+```
+
+The status page lists the baseline documents with links to Confluence.
+
 ## Development
 
 ```bash
@@ -73,6 +103,7 @@ npm run dev                             # API on :3000 (tsx watch), UI on :5173 
 | `npm run build`                   | Build shared, server and web                                                            |
 | `npm run db:generate`             | Create a migration after changing `apps/server/src/db/schema.ts`                        |
 | `npm run db:migrate`              | Apply migrations without starting the server (the server also applies them at start-up) |
+| `npm run seed`                    | Seed the demo project from your machine (add `-- --live` or `-- --sync-only`)            |
 
 ## Structure
 
@@ -82,7 +113,8 @@ apps/web          React + Vite UI
 packages/shared   zod schemas and types shared by server and web
 agents/           agent definitions (one Markdown file per role)
 skills/           knowledge packages used by the agents
-config/           YAML settings: sprint cadence, rates, feasibility rules
+config/           YAML settings: sprint cadence, feasibility rules
+seed/baseline/    the demo project's baseline: data (YAML) and page texts (Markdown)
 ```
 
 ## Configuration notes

@@ -1,5 +1,7 @@
+import type { BaselineSummary } from '@ai-pm/shared';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import { registerBaselineRoutes } from './api/baseline.js';
 import { registerHealthRoutes } from './api/health.js';
 import type { HealthProbe } from './health/probe.js';
 
@@ -7,6 +9,8 @@ export interface AppOptions {
   logger: FastifyServerOptions['logger'];
   probes: HealthProbe[];
   version: string;
+  /** Reads the project baseline from the database. */
+  baseline?: () => Promise<BaselineSummary>;
   /** Built web UI to serve; omitted in dev, where Vite serves the UI. */
   webDistDir?: string;
 }
@@ -15,11 +19,13 @@ export async function buildApp({
   logger,
   probes,
   version,
+  baseline,
   webDistDir,
 }: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger });
 
   registerHealthRoutes(app, { probes, version });
+  if (baseline) registerBaselineRoutes(app, baseline);
 
   if (webDistDir) {
     await app.register(fastifyStatic, { root: webDistDir, wildcard: false });

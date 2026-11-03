@@ -1,0 +1,57 @@
+assumptions:
+  - {
+      id: A-01,
+      text: 'iOS and Android launch globally on the same day',
+      owner: Ethan Brooks,
+      status: validated,
+      validate_by: 2026-06-30,
+    }
+  - {
+      id: A-02,
+      text: 'The client funds user acquisition separately (USD 1.5 M in year 1)',
+      owner: Olivia Grant,
+      status: open,
+      validate_by: 2026-12-15,
+    }
+  - {
+      id: A-03,
+      text: 'The team composition stays stable until global launch',
+      owner: Daniel Okafor,
+      status: open,
+      validate_by: 2027-02-15,
+    }
+  - {
+      id: A-04,
+      text: 'Unity 6 LTS stays supported for the whole project',
+      owner: Lucas Moreau,
+      status: validated,
+      validate_by: 2026-03-31,
+    }
+  - {
+      id: A-05,
+      text: 'Soft-launch KPIs represent the global audience within 15 %',
+      owner: Maya Chen,
+      status: open,
+      validate_by: 2027-03-31,
+    }
+  - {
+      id: A-06,
+      text: 'Rewarded video eCPM in tier-1 markets stays at or above USD 10',
+      owner: Hannah Lee,
+      status: open,
+      validate_by: 2027-01-31,
+    }
+  - {
+      id: A-07,
+      text: 'The game is not directed at children (no COPPA obligations)',
+      owner: Olivia Grant,
+      status: validated,
+      validate_by: 2026-02-28,
+    }
+  - {
+      id: A-08,
+      text: 'Backend hosting stays under USD 2,000 per month up to 200k DAU',
+      owner: Tomasz Kowalski,
+      status: open,
+      validate_by: 2027-01-15,
+    }

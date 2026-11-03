@@ -1,0 +1,41 @@
+releases:
+  - {
+      id: R0,
+      name: Pre-production,
+      window: Jan–Feb 2026,
+      status: done,
+      goals: 'Prototype and validate the core loop',
+      epics: [],
+    }
+  - {
+      id: R1,
+      name: Soft launch,
+      window: Sep 2026,
+      status: done,
+      goals: 'Core runner, basic meta, IAP and rewarded ads in Canada and Australia',
+      epics: [EP-CORE],
+    }
+  - {
+      id: R2,
+      name: Global launch,
+      window: Feb 2027,
+      status: in progress,
+      goals: 'Low-end performance, 8 languages, store readiness, economy tuning',
+      epics: [EP-META, EP-MON, EP-LAUNCH],
+    }
+  - {
+      id: R3,
+      name: Live-ops 1,
+      window: Q2 2027,
+      status: planned,
+      goals: 'Season events, remote tuning, weekly leaderboards',
+      epics: [EP-LIVE],
+    }
+  - {
+      id: R4,
+      name: Social & cloud,
+      window: Q3 2027,
+      status: planned,
+      goals: 'Friends, cloud save, sharing',
+      epics: [],
+    }

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { FastifyServerOptions } from 'fastify';
 import { buildApp } from './app.js';
+import { readBaselineSummary } from './baseline/store.js';
 import { type AppConfig, atlassianCredentials, ConfigError, loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 import { runMigrations, waitForDatabase } from './db/migrate.js';
@@ -39,6 +40,7 @@ async function main() {
     logger: loggerOptions(config),
     probes,
     version: pkg.version,
+    baseline: () => readBaselineSummary(db, config),
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
   });
 

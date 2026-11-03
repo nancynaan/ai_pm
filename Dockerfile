@@ -38,6 +38,7 @@ COPY apps/server/drizzle apps/server/drizzle
 COPY agents agents
 COPY skills skills
 COPY config config
+COPY seed seed
 USER node
 EXPOSE 3000
 CMD ["node", "apps/server/dist/index.js"]

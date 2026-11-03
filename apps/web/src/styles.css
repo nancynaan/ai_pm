@@ -162,3 +162,40 @@ th {
     display: none;
   }
 }
+
+a {
+  color: inherit;
+  text-decoration-color: var(--muted);
+}
+
+code {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+details {
+  margin-top: 12px;
+}
+
+summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+pre {
+  margin: 8px 0 0;
+  padding: 12px;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
