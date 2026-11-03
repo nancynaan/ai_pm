@@ -11,7 +11,7 @@ An AI pipeline that does project-management work for a Scrum game project (an en
 
 It also emails the team before sprint events. Everything runs locally with Docker Compose, and all data is kept in PostgreSQL.
 
-> **Status:** Phase 0 (foundations). The server starts, migrates the database and reports the health of every dependency. The pipeline itself arrives in the next phases.
+> **Status:** Phase 2 of 10. The pipeline runs end to end in the chat UI with placeholder stages; the real agents arrive in Phases 3–7.
 
 ## Prerequisites
 
@@ -87,6 +87,16 @@ docker compose exec app node apps/server/dist/baseline/cli.js --sync-only
 
 The status page lists the baseline documents with links to Confluence.
 
+## Using the chat
+
+Open <http://localhost:3000>, describe a feature as the client and send it. The AI PM asks a short questionnaire, shows progress through the stages, and asks for your decision (approve, request changes or decline). Runs survive restarts: a stage that was cut off is retried when the app comes back. **System status** is the second tab.
+
+To check that Claude works through your subscription, make one small real call:
+
+```bash
+docker compose exec app node apps/server/dist/agents/smoke-cli.js
+```
+
 ## Development
 
 ```bash
@@ -103,7 +113,7 @@ npm run dev                             # API on :3000 (tsx watch), UI on :5173 
 | `npm run build`                   | Build shared, server and web                                                            |
 | `npm run db:generate`             | Create a migration after changing `apps/server/src/db/schema.ts`                        |
 | `npm run db:migrate`              | Apply migrations without starting the server (the server also applies them at start-up) |
-| `npm run seed`                    | Seed the demo project from your machine (add `-- --live` or `-- --sync-only`)            |
+| `npm run seed`                    | Seed the demo project from your machine (add `-- --live` or `-- --sync-only`)           |
 
 ## Structure
 

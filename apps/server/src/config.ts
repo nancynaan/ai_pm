@@ -28,6 +28,7 @@ const envSchema = z.object({
   ATLASSIAN_WRITE_MODE: z.preprocess(blank, z.enum(['dry-run', 'live']).default('dry-run')),
 
   CLIENT_GATE_AUTO_APPROVE: flag(false),
+  PIPELINE_PLACEHOLDER_DELAY_MS: z.preprocess(blank, z.coerce.number().int().min(0).default(1500)),
 
   SMTP_HOST: optionalString,
   MAILPIT_HOST: z.preprocess(blank, z.string().default('localhost')),
@@ -58,7 +59,7 @@ export interface AppConfig {
     confluenceSpaceKey?: string;
     writeMode: WriteMode;
   };
-  pipeline: { clientGateAutoApprove: boolean };
+  pipeline: { clientGateAutoApprove: boolean; placeholderDelayMs: number };
   /** With no SMTP_HOST set, email goes to the local Mailpit inbox. */
   smtp: {
     host: string;
@@ -97,7 +98,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       confluenceSpaceKey: e.CONFLUENCE_SPACE_KEY,
       writeMode: e.ATLASSIAN_WRITE_MODE,
     },
-    pipeline: { clientGateAutoApprove: e.CLIENT_GATE_AUTO_APPROVE },
+    pipeline: {
+      clientGateAutoApprove: e.CLIENT_GATE_AUTO_APPROVE,
+      placeholderDelayMs: e.PIPELINE_PLACEHOLDER_DELAY_MS,
+    },
     smtp: {
       host: e.SMTP_HOST ?? e.MAILPIT_HOST,
       port: e.SMTP_PORT,

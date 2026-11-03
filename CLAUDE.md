@@ -7,7 +7,8 @@ Design documents live **outside this repository**, in `../docs/`: BPMN models (`
 ## Layout
 
 - `apps/server`: Node.js 24 + TypeScript (Fastify, Drizzle/PostgreSQL).
-  - `src/harness` (Phase 2+) orchestrates.
+  - `src/harness` runs the pipeline: state machine (`states.ts`), orchestrator with per-run advisory locks, retries and usage-limit pauses, pg-boss stage jobs, event bus, and stage handlers (`stages/`, placeholders until Phases 3–7).
+  - `src/agents` runs agents: `runner.ts` (claude -p with a JSON schema, repair loop, limit detection), `registry.ts` (agents/_.agent.md and skills/_/SKILL.md).
   - `src/integrations` talks to Atlassian (REST), Claude (CLI) and SMTP.
   - `src/render` turns one Markdown source into Confluence storage format and Jira ADF.
   - `src/sync` holds the idempotent publisher and the sync log.
@@ -49,5 +50,6 @@ docker compose up --build  # full stack: http://localhost:3000, Mailpit http://l
 ## Status
 
 - Phase 0 (foundations) is done: workspaces, Docker Compose, config, migrations, and `/api/health`.
-- Phase 1 (Atlassian gateway and baseline seed) is built and verified in dry-run against the real site: REST gateway, renderers, publisher with sync log, seed CLI, baseline and digest in the database, `GET /api/baseline` and the status-page section.
-- Next is Phase 2: the harness core (state machine, jobs, AgentRunner on `claude -p`, walking skeleton).
+- Phase 1 (Atlassian gateway and baseline seed) is done and seeded live.
+- Phase 2 (harness core) is done: runs go intake → completed with placeholder stages, survive a crash (interrupted attempts are retried), and stream events to the chat UI. `node apps/server/dist/agents/smoke-cli.js` makes one real Claude call.
+- Next is Phase 3: intake and analysis with real agents (draft Epic, elicitation and question bank, requirements and impact analysis).

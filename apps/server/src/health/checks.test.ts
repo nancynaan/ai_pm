@@ -56,6 +56,17 @@ describe('health probes', () => {
     expect(result.detail).toBe('Claude Code 2.1.316, signed in (oauth_token); agents use claude-opus-5-5');
   });
 
+  it('flags a token that cannot come from claude setup-token', async () => {
+    const bad = await check('claude', baseDeps({ claude: claudeCli(true), claudeToken: 'L3L7-not-a-token' }));
+    expect(bad).toMatchObject({ status: 'error' });
+    expect(bad.detail).toContain('sk-ant-oat01-');
+    const good = await check(
+      'claude',
+      baseDeps({ claude: claudeCli(true), claudeToken: 'sk-ant-oat01-abc' }),
+    );
+    expect(good.status).toBe('ok');
+  });
+
   it('reports a missing Claude Code CLI as an error', async () => {
     const missing = {
       version: () => Promise.reject(new Error('Claude Code CLI not found at "claude"')),

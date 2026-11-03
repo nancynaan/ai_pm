@@ -3,6 +3,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import { registerBaselineRoutes } from './api/baseline.js';
 import { registerHealthRoutes } from './api/health.js';
+import { type RunRouteDeps, registerRunRoutes } from './api/runs.js';
 import type { HealthProbe } from './health/probe.js';
 
 export interface AppOptions {
@@ -11,6 +12,8 @@ export interface AppOptions {
   version: string;
   /** Reads the project baseline from the database. */
   baseline?: () => Promise<BaselineSummary>;
+  /** The pipeline: orchestrator, run repository and event bus. */
+  runs?: RunRouteDeps;
   /** Built web UI to serve; omitted in dev, where Vite serves the UI. */
   webDistDir?: string;
 }
@@ -20,12 +23,14 @@ export async function buildApp({
   probes,
   version,
   baseline,
+  runs,
   webDistDir,
 }: AppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger });
 
   registerHealthRoutes(app, { probes, version });
   if (baseline) registerBaselineRoutes(app, baseline);
+  if (runs) registerRunRoutes(app, runs);
 
   if (webDistDir) {
     await app.register(fastifyStatic, { root: webDistDir, wildcard: false });

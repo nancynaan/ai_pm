@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { z } from 'zod';
+import { parseFrontMatter } from '../util/front-matter.js';
 
 /** seed/baseline at the repository root, reached the same way from src/ and dist/. */
 export const SEED_DIR = fileURLToPath(new URL('../../../../seed/baseline', import.meta.url));
@@ -206,11 +207,8 @@ export function loadSeedData(dir: string = SEED_DIR): SeedData {
 }
 
 function parsePage(file: string, source: string): SeedPage {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/.exec(source);
-  if (!match?.[1] || match[2] === undefined) throw new Error(`${file}: missing YAML front matter`);
-  const front = frontMatterSchema.safeParse(parse(match[1]));
-  if (!front.success) throw new Error(`${file}:\n${z.prettifyError(front.error)}`);
-  return { file, ...front.data, body: match[2].trim() };
+  const { data, body } = parseFrontMatter(source, frontMatterSchema, file);
+  return { file, ...data, body };
 }
 
 /** Cross-file consistency: every reference points at something that exists, ids are unique. */

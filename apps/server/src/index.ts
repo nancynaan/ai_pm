@@ -6,6 +6,11 @@ import { readBaselineSummary } from './baseline/store.js';
 import { type AppConfig, atlassianCredentials, ConfigError, loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 import { runMigrations, waitForDatabase } from './db/migrate.js';
+import { createEventBus } from './harness/events.js';
+import { createOrchestrator } from './harness/orchestrator.js';
+import { createPgBossQueue } from './harness/queue.js';
+import { createRunRepository } from './harness/repository.js';
+import { placeholderStages } from './harness/stages/placeholder.js';
 import { buildProbes } from './health/checks.js';
 import { createAtlassianGateway } from './integrations/atlassian/index.js';
 import { createClaudeCli } from './integrations/claude-cli.js';
@@ -28,19 +33,33 @@ async function main() {
 
   const { db, pool } = createDb(config.databaseUrl);
   const credentials = atlassianCredentials(config);
+  const claude = createClaudeCli({ cliPath: config.claude.cliPath });
   const probes = buildProbes({
     config,
     query: (sql) => pool.query(sql),
     atlassian: credentials && createAtlassianGateway(credentials),
-    claude: createClaudeCli({ cliPath: config.claude.cliPath }),
+    claude,
+    claudeToken: process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || undefined,
     mailer: createMailer(config.smtp),
   });
 
+  const repo = createRunRepository(db);
+  const bus = createEventBus(repo);
+  // Created after the database is ready; routes only receive requests after listen().
+  const pipeline: { orchestrator?: ReturnType<typeof createOrchestrator> } = {};
   const app = await buildApp({
     logger: loggerOptions(config),
     probes,
     version: pkg.version,
     baseline: () => readBaselineSummary(db, config),
+    runs: {
+      get orchestrator() {
+        if (!pipeline.orchestrator) throw new Error('The pipeline is still starting');
+        return pipeline.orchestrator;
+      },
+      repo,
+      bus,
+    },
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
   });
 
@@ -48,9 +67,24 @@ async function main() {
   await runMigrations(db);
   app.log.info('database migrations applied');
 
+  const orchestrator = createOrchestrator({
+    repo,
+    bus,
+    queue: createPgBossQueue(config.databaseUrl, (err) => app.log.error({ err }, 'job queue error')),
+    pool,
+    handlers: placeholderStages({
+      delayMs: config.pipeline.placeholderDelayMs,
+      autoApprove: config.pipeline.clientGateAutoApprove,
+    }),
+    log: app.log,
+  });
+  pipeline.orchestrator = orchestrator;
+  await orchestrator.start();
+
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');
     await app.close();
+    await orchestrator.stop();
     await pool.end();
     process.exit(0);
   };

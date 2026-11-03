@@ -3,7 +3,7 @@ import { createClaudeCli, type Exec } from './claude-cli.js';
 
 describe('createClaudeCli', () => {
   it('reads the version number', async () => {
-    const exec = vi.fn<Exec>(async () => ({ stdout: '2.1.316 (Claude Code)\n', exitCode: 0 }));
+    const exec = vi.fn<Exec>(async () => ({ stdout: '2.1.316 (Claude Code)\n', stderr: '', exitCode: 0 }));
     const cli = createClaudeCli({ cliPath: 'claude', exec });
 
     await expect(cli.version()).resolves.toBe('2.1.316');
@@ -16,7 +16,10 @@ describe('createClaudeCli', () => {
       authMethod: 'none',
       configDirectory: '/home/node/.claude',
     });
-    const cli = createClaudeCli({ cliPath: 'claude', exec: async () => ({ stdout, exitCode: 1 }) });
+    const cli = createClaudeCli({
+      cliPath: 'claude',
+      exec: async () => ({ stdout, stderr: '', exitCode: 1 }),
+    });
 
     await expect(cli.authStatus()).resolves.toEqual({ loggedIn: false, authMethod: 'none' });
   });
@@ -24,6 +27,7 @@ describe('createClaudeCli', () => {
   it('drops an empty CLAUDE_CODE_OAUTH_TOKEN so the CLI falls back to its own login', async () => {
     const exec = vi.fn<Exec>(async () => ({
       stdout: '{"loggedIn":true,"authMethod":"claude.ai"}',
+      stderr: '',
       exitCode: 0,
     }));
     const cli = createClaudeCli({
@@ -39,6 +43,7 @@ describe('createClaudeCli', () => {
   it('passes a real token through to the CLI', async () => {
     const exec = vi.fn<Exec>(async () => ({
       stdout: '{"loggedIn":true,"authMethod":"oauth_token"}',
+      stderr: '',
       exitCode: 0,
     }));
     const cli = createClaudeCli({ cliPath: 'claude', exec, env: { CLAUDE_CODE_OAUTH_TOKEN: 'tok' } });

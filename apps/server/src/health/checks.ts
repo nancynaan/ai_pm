@@ -8,13 +8,22 @@ export interface ProbeDeps {
   query: (sql: string) => Promise<{ rows: Record<string, unknown>[] }>;
   atlassian?: AtlassianGateway;
   claude: Pick<ClaudeCli, 'version' | 'authStatus'>;
+  /** CLAUDE_CODE_OAUTH_TOKEN, only to check its format. */
+  claudeToken?: string;
   mailer: { verify(): Promise<unknown> };
 }
 
 const MISSING_ATLASSIAN = 'Set ATLASSIAN_SITE_URL, ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN in .env';
 
 /** Everything Phase 0 must prove before the pipeline can run. */
-export function buildProbes({ config, query, atlassian, claude, mailer }: ProbeDeps): HealthProbe[] {
+export function buildProbes({
+  config,
+  query,
+  atlassian,
+  claude,
+  claudeToken,
+  mailer,
+}: ProbeDeps): HealthProbe[] {
   const { jiraProjectKey, jiraBoardId, confluenceSpaceKey } = config.atlassian;
   return [
     {
@@ -88,6 +97,12 @@ export function buildProbes({ config, query, atlassian, claude, mailer }: ProbeD
         if (!status.loggedIn) {
           return notConfigured(
             `Claude Code ${version} is installed but not signed in. For Docker, run "claude setup-token" on your machine and put the token in .env as CLAUDE_CODE_OAUTH_TOKEN; on your machine, run "claude auth login".`,
+          );
+        }
+        // `auth status` only sees that a token is present; catch tokens that cannot be valid.
+        if (claudeToken && !claudeToken.startsWith('sk-ant-oat')) {
+          return failed(
+            'CLAUDE_CODE_OAUTH_TOKEN is not a token from "claude setup-token" (those start with sk-ant-oat01-). Run it again and paste the whole token.',
           );
         }
         return ok(
