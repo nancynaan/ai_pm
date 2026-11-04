@@ -44,25 +44,35 @@ export function createAnalysisRepository(db: Db) {
         await db.update(featureRequests).set({ epicKey }).where(eq(featureRequests.id, run.featureRequestId));
     },
 
-    async replaceElicitationAssumptions(runId: string, items: { text: string; reason: string }[]) {
+    /** Discovery assumptions: client hypotheses, AI hypotheses, defaults and accepted open issues. */
+    async replaceElicitationAssumptions(
+      runId: string,
+      items: { text: string; reason: string; kind?: string }[],
+    ) {
       await db.transaction(async (tx) => {
         await tx
           .delete(assumptions)
           .where(and(eq(assumptions.runId, runId), eq(assumptions.source, 'elicitation')));
         if (items.length) {
-          await tx
-            .insert(assumptions)
-            .values(items.map((a) => ({ runId, text: `${a.text} (${a.reason})`, source: 'elicitation' })));
+          await tx.insert(assumptions).values(
+            items.map((a) => ({
+              runId,
+              text: `${a.text} (${a.reason})`,
+              source: 'elicitation',
+              kind: a.kind ?? 'assumption',
+            })),
+          );
         }
       });
     },
 
+    /** "[client hypothesis] …" lines for the analysts' prompts. */
     async elicitationAssumptions(runId: string): Promise<string[]> {
       const rows = await db
-        .select({ text: assumptions.text })
+        .select({ text: assumptions.text, kind: assumptions.kind })
         .from(assumptions)
         .where(and(eq(assumptions.runId, runId), eq(assumptions.source, 'elicitation')));
-      return rows.map((r) => r.text);
+      return rows.map((r) => `[${r.kind.replaceAll('_', ' ')}] ${r.text}`);
     },
 
     async saveAnalysis(runId: string, { analysis, impact, magnitude, magnitudeReason }: AnalysisToSave) {

@@ -12,7 +12,9 @@ import { canTransition, stateAfterDecision } from './states.js';
 describe('state machine', () => {
   it('allows the BPMN path and rejects shortcuts', () => {
     expect(canTransition('intake', 'awaiting_answers')).toBe(true);
-    expect(canTransition('eliciting', 'awaiting_answers')).toBe(true); // follow-up round
+    expect(canTransition('eliciting', 'awaiting_answers')).toBe(true); // clarification round
+    expect(canTransition('eliciting', 'awaiting_confirmation')).toBe(true); // still blocked after the last round
+    expect(canTransition('awaiting_confirmation', 'estimating')).toBe(false);
     expect(canTransition('presenting', 'backlog')).toBe(true); // auto-approve
     expect(canTransition('intake', 'backlog')).toBe(false);
     expect(canTransition('analyzing', 'failed')).toBe(true);
@@ -169,6 +171,24 @@ describe('orchestrator', () => {
       'backlog',
       'completed',
     ]);
+  });
+
+  it('lets the client continue with a preliminary assessment, or stop, after an incomplete discovery', async () => {
+    const h = harness({});
+    const go = await h.orchestrator.createRun('A feature with open points');
+    const stop = await h.orchestrator.createRun('Another feature with open points');
+    await expect(h.orchestrator.confirmDiscovery(go.id, { proceed: true })).rejects.toThrow(/not waiting/);
+    h.runs.get(go.id)!.state = 'awaiting_confirmation';
+    h.runs.get(stop.id)!.state = 'awaiting_confirmation';
+
+    await h.orchestrator.confirmDiscovery(go.id, { proceed: true, comment: 'Budget owner agrees' });
+    await h.orchestrator.confirmDiscovery(stop.id, { proceed: false });
+    expect(h.runs.get(go.id)!.state).toBe('analyzing');
+    expect(h.runs.get(stop.id)!.state).toBe('declined');
+    expect(h.jobs.at(-1)?.job).toEqual({ runId: go.id, state: 'analyzing' });
+    expect(h.events).toContainEqual(
+      expect.objectContaining({ role: 'client', text: expect.stringContaining('Budget owner agrees') }),
+    );
   });
 
   it('retries a failing stage with backoff, then fails the run; a manual retry starts afresh', async () => {

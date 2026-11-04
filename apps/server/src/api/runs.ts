@@ -1,4 +1,10 @@
-import { answersSchema, createRunSchema, decisionSchema, type StoredRunEvent } from '@ai-pm/shared';
+import {
+  answersSchema,
+  createRunSchema,
+  decisionSchema,
+  discoveryConfirmationSchema,
+  type StoredRunEvent,
+} from '@ai-pm/shared';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { EventBus } from '../harness/events.js';
@@ -52,6 +58,14 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
       await deps.orchestrator.submitAnswers(id, answersSchema.parse(request.body));
+      return { ok: true };
+    }),
+  );
+
+  app.post('/api/runs/:id/discovery-decision', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      await deps.orchestrator.confirmDiscovery(id, discoveryConfirmationSchema.parse(request.body));
       return { ok: true };
     }),
   );

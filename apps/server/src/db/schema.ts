@@ -151,8 +151,15 @@ export const questionnaires = pgTable(
       .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
     round: integer('round').notNull(),
     questions: jsonb('questions').$type<unknown[]>().notNull(),
+    /** Section headings the questions are grouped under. */
+    sections: jsonb('sections').$type<unknown[]>(),
+    allowComment: boolean('allow_comment').notNull().default(false),
     /** Question id → selected option values; null until the client answers. */
     answers: jsonb('answers').$type<Record<string, string[]>>(),
+    /** "questionId:optionValue" → the client's text for options that ask for details. */
+    details: jsonb('details').$type<Record<string, string>>(),
+    /** Optional free-text comment sent with the answers. */
+    comment: text('comment'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     answeredAt: timestamp('answered_at', { withTimezone: true }),
   },
@@ -164,7 +171,8 @@ export const decisions = pgTable('decisions', {
   runId: uuid('run_id')
     .notNull()
     .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
-  /** approve | changes | decline */
+  /** assessment (approve | changes | decline) or discovery (proceed | stop) */
+  gate: text('gate').notNull().default('assessment'),
   decision: text('decision').notNull(),
   comment: text('comment'),
   decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
@@ -212,8 +220,10 @@ export const assumptions = pgTable('assumptions', {
     .notNull()
     .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
   text: text('text').notNull(),
-  /** elicitation (e.g. a "not sure" answer) | analysis */
+  /** elicitation (discovery) | analysis */
   source: text('source').notNull(),
+  /** client_hypothesis | ai_hypothesis | default | open_issue | assumption */
+  kind: text('kind').notNull().default('assumption'),
   owner: text('owner'),
   status: text('status').notNull().default('open'),
 });

@@ -1,6 +1,7 @@
-import { type Answers, type Decision, NOT_SURE, type RunEvent, type RunState } from '@ai-pm/shared';
+import type { Answers, Decision, DiscoveryConfirmation, RunEvent, RunState } from '@ai-pm/shared';
 import type pg from 'pg';
 import { UsageLimitReached } from '../agents/runner.js';
+import { InvalidSubmission, validateSubmission } from './discovery.js';
 import type { EventBus } from './events.js';
 import type { StageQueue, StageJob } from './queue.js';
 import type { RunRecord, RunRepository } from './repository.js';
@@ -197,28 +198,39 @@ export function createOrchestrator(opts: OrchestratorOptions) {
         if (!questionnaire || questionnaire.id !== submission.questionnaireId) {
           throw new RunActionError('This questionnaire is no longer open', 409);
         }
-        const lines: string[] = [];
-        for (const question of questionnaire.questions) {
-          const values = submission.answers[question.id];
-          if (!values?.length) throw new RunActionError(`Please answer: ${question.text}`, 400);
-          if (question.kind === 'single' && values.length !== 1) {
-            throw new RunActionError(`Choose one answer for: ${question.text}`, 400);
-          }
-          const labels = values.map((value) => {
-            const option = question.options.find((o) => o.value === value);
-            if (!option) throw new RunActionError(`Unknown answer "${value}" for: ${question.text}`, 400);
-            return option.label;
-          });
-          lines.push(`- ${question.text} **${labels.join(', ')}**`);
+        let checked: ReturnType<typeof validateSubmission>;
+        try {
+          checked = validateSubmission(questionnaire, submission);
+        } catch (err) {
+          if (err instanceof InvalidSubmission) throw new RunActionError(err.message, 400);
+          throw err;
         }
-        const notSure = Object.values(submission.answers).filter((v) => v.includes(NOT_SURE)).length;
-        await repo.saveAnswers(questionnaire.id, submission.answers);
+        const comment = questionnaire.allowComment ? submission.comment?.trim() || null : null;
+        await repo.saveAnswers(questionnaire.id, checked.answers, { details: checked.details, comment });
         await bus.publish(run.id, {
           type: 'message',
           role: 'client',
-          text: `My answers:\n${lines.join('\n')}${notSure ? `\n\n(${notSure} × "not sure")` : ''}`,
+          text: `My answers:\n${checked.lines.join('\n')}${comment ? `\n\nAdditional comments: ${comment}` : ''}`,
         });
         await moveTo(run, 'eliciting');
+      });
+    },
+
+    /** After the last clarification round: go on with a preliminary assessment, or stop. */
+    async confirmDiscovery(runId: string, { proceed, comment }: DiscoveryConfirmation) {
+      return act(runId, async (run) => {
+        if (run.state !== 'awaiting_confirmation')
+          throw new RunActionError(`The run is ${run.state}, not waiting for a discovery decision`, 409);
+        await repo.saveDecision(run.id, proceed ? 'proceed' : 'stop', comment, 'discovery');
+        const label = proceed
+          ? 'Continue with a preliminary assessment based on the documented assumptions'
+          : 'Stop here; I will come back with more information';
+        await bus.publish(run.id, {
+          type: 'message',
+          role: 'client',
+          text: comment ? `${label}. ${comment}` : label,
+        });
+        await moveTo(run, proceed ? 'analyzing' : 'declined');
       });
     },
 

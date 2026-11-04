@@ -1,0 +1,381 @@
+# Discovery questionnaire and completeness rules (BPMN 01).
+#
+# The ten core questions are fixed, so every feature is assessed on the same basis. The elicitation
+# agent may add up to two feature-specific questions. After the client answers, the harness checks
+# the answers with the rules below (contradictions, gaps, evidence) and the discovery-review agent
+# adds what rules cannot see. The pipeline goes on to the assessment only when nothing blocking is
+# left, or when the client explicitly accepts a preliminary assessment.
+#
+# Option fields (server only, not sent to the UI):
+#   unknown: true      the answer means "we don't know yet"; counts as missing information
+#   evidence: strong | weak | none     how well the request is backed (question `evidence`)
+#   approval: full | scope_only | none who can approve (question `approval`)
+#   detailRequired: true  a missing detail is a (non-critical) gap
+#   fillsDetail: q:opt    (clarification options) the answer's detail also answers that core detail
+# Option fields sent to the UI: exclusive, excludes, detail (shows a text field).
+
+# Questionnaire rounds per run, including the first. After the last round, blocking issues go to
+# the client as a decision instead of more questions.
+maxRounds: 2
+# At most this many clarification questions per round (rule questions first).
+maxClarifications: 4
+# At most this many feature-specific questions from the elicitation agent.
+maxFeatureQuestions: 2
+
+sections:
+  - id: business_justification
+    title: Business justification
+    description: Why the feature matters and what outcome you expect.
+    criticalWhenMissing: true
+  - id: product_context
+    title: Product context
+    description: Who the feature is for.
+  - id: scope
+    title: First release
+    description: What you expect in the first version and how you will judge it.
+  - id: feasibility
+    title: Feasibility and constraints
+    description: Timing, budget, dependencies and limitations.
+  - id: decision_readiness
+    title: Decision-making
+    description: Who can approve the scope and the investment.
+
+questions:
+  - id: problem
+    section: business_justification
+    text: What is the primary problem or opportunity this feature should address?
+    kind: single
+    why: The value case starts from the problem, not from the feature.
+    infoKind: confirmed
+    label: Problem or opportunity
+    options:
+      - { value: retention, label: "Low player retention: players don't return to the game regularly" }
+      - { value: engagement, label: "Low player engagement: players don't spend enough time playing" }
+      - {
+          value: progression,
+          label: 'Lack of progression: players need more goals and reasons to keep playing',
+        }
+      - {
+          value: monetization,
+          label: 'Monetization opportunity: the feature should create additional revenue',
+        }
+      - { value: experience, label: 'Player experience: the current gameplay experience needs improvement' }
+      - { value: competition, label: 'Competitive positioning: similar games offer something we lack' }
+      - { value: other, label: Other, detail: Which problem or opportunity?, detailRequired: true }
+      - { value: undetermined, label: Not yet determined, unknown: true }
+    whenUnknown:
+      gap: The problem or opportunity behind the feature is not defined.
+      assumption: The problem is taken from the feature description and must be confirmed by the client.
+
+  - id: outcome
+    section: business_justification
+    text: What is the main business outcome you expect from this feature?
+    kind: multi
+    maxSelections: 2
+    why: The outcome decides which KPI the value model uses.
+    infoKind: client_assumption
+    label: Expected outcome
+    options:
+      - { value: dau, label: Increase Daily Active Users (DAU) }
+      - { value: retention_d1_d7, label: Improve Day 1 / Day 7 player retention }
+      - { value: session_length, label: Increase average session duration }
+      - { value: sessions_per_player, label: Increase the number of sessions per player }
+      - { value: revenue, label: Increase in-app purchase or advertising revenue }
+      - { value: satisfaction, label: Improve player satisfaction and engagement }
+      - { value: acquisition, label: Attract new players }
+      - { value: other, label: Other, detail: Which outcome?, detailRequired: true }
+      - { value: undetermined, label: Not yet determined, exclusive: true, unknown: true }
+    whenUnknown:
+      gap: The expected business outcome is not defined.
+      assumption: The PM team proposes the target KPI from the problem statement; the client confirms it.
+
+  - id: evidence
+    section: business_justification
+    text: What is the basis for requesting this feature?
+    kind: multi
+    why: Evidence decides whether the expected outcome is a supported case or a hypothesis to test.
+    infoKind: confirmed
+    label: Basis for the request
+    options:
+      - { value: analytics, label: Game analytics show a problem or opportunity, evidence: strong }
+      - { value: player_requests, label: Players have explicitly asked for it, evidence: strong }
+      - { value: reviews_social, label: Feedback from store reviews or social media, evidence: strong }
+      - { value: competitor, label: Competitor analysis revealed an opportunity, evidence: strong }
+      - { value: strategy, label: Internal product strategy or roadmap, evidence: weak }
+      - { value: intuition, label: Business intuition or a hypothesis, evidence: weak }
+      - { value: other, label: Other, detail: What is the basis?, detailRequired: true, evidence: weak }
+      - { value: no_evidence, label: No supporting evidence yet, exclusive: true, evidence: none }
+
+  - id: audience
+    section: product_context
+    text: Which player audience should benefit most from this feature?
+    kind: single
+    why: The audience decides how many players the feature reaches.
+    infoKind: confirmed
+    label: Target audience
+    options:
+      - { value: new, label: 'New players: recently installed the game' }
+      - { value: casual, label: 'Casual players: play occasionally' }
+      - { value: active, label: 'Active players: play regularly' }
+      - { value: highly_engaged, label: 'Highly engaged players: play every day' }
+      - { value: payers, label: 'Paying players: make in-app purchases' }
+      - { value: all, label: All player segments }
+      - {
+          value: to_define,
+          label: A specific audience that still needs defining,
+          detail: Who do you have in mind?,
+          unknown: true,
+        }
+    whenUnknown:
+      gap: The target audience is not defined.
+      assumption: The feature targets all active players until the client narrows the audience.
+
+  - id: first_release_scope
+    section: scope
+    text: What should the first version of this feature include?
+    kind: multi
+    why: This is your expectation for the first release; the team proposes the MVP from it.
+    infoKind: confirmed
+    label: First-release expectations
+    options:
+      - { value: core, label: Core functionality required for the feature to work }
+      - { value: ui, label: User interface and visual elements }
+      - { value: economy, label: 'Rewards, progression or in-game economy integration' }
+      - { value: notifications, label: Notifications and player reminders }
+      - { value: analytics, label: Analytics and performance tracking }
+      - { value: integration, label: Integration with existing game systems }
+      - { value: extras, label: Additional functionality beyond the basic concept, detail: What else? }
+      - {
+          value: undefined,
+          label: 'Scope is not yet defined: recommendations are welcome',
+          exclusive: true,
+          unknown: true,
+        }
+    whenUnknown:
+      gap: The client has no scope expectation for the first release.
+      assumption: The PM team proposes the first-release scope (AI hypothesis); the client confirms it at the decision gate.
+
+  - id: success
+    section: scope
+    text: How would you define success after releasing this feature?
+    kind: multi
+    maxSelections: 2
+    why: Success criteria become the acceptance criteria of the business case.
+    infoKind: client_assumption
+    label: Success definition
+    options:
+      - { value: retention, label: Higher player retention }
+      - { value: engagement, label: Higher player engagement }
+      - { value: revenue, label: Higher revenue }
+      - { value: adoption, label: Strong adoption among active players }
+      - { value: feedback, label: Positive player feedback }
+      - {
+          value: kpi_target,
+          label: A specific KPI target,
+          detail: 'Which KPI and target? (for example D7 retention +2 points)',
+          detailRequired: true,
+        }
+      - { value: stability, label: Successful technical delivery and stable operation }
+      - { value: undefined, label: Success criteria are not defined yet, exclusive: true, unknown: true }
+    whenUnknown:
+      gap: Success criteria are not defined.
+      assumption: The PM team proposes measurable success criteria (AI hypothesis); the client confirms them.
+
+  - id: priority
+    section: feasibility
+    text: What implementation priority do you expect?
+    kind: single
+    why: Priority and timing drive the schedule recommendation.
+    infoKind: confirmed
+    label: Priority
+    options:
+      - {
+          value: critical,
+          label: 'Critical: required for an upcoming release or business commitment',
+          detail: Which release or date?,
+          detailRequired: true,
+        }
+      - { value: high, label: 'High: should be in the next planned release' }
+      - { value: medium, label: 'Medium: important, but timing is flexible' }
+      - { value: low, label: 'Low: can wait for a future release' }
+      - { value: exploratory, label: 'Exploratory: assess feasibility before committing' }
+
+  - id: constraints
+    section: feasibility
+    text: Are there any budget, timeline, technical or organizational constraints?
+    kind: multi
+    why: Constraints decide which schedule and scope options are feasible.
+    infoKind: confirmed
+    label: Constraints
+    options:
+      - {
+          value: fixed_budget,
+          label: Fixed budget with limited flexibility,
+          excludes: [flexible_budget],
+          detail: 'Budget limit, if known',
+        }
+      - {
+          value: flexible_budget,
+          label: 'Flexible budget, subject to business justification',
+          excludes: [fixed_budget],
+        }
+      - {
+          value: fixed_deadline,
+          label: 'Fixed date: an external deadline or contractual commitment',
+          excludes: [flexible_timeline],
+          detail: Which date?,
+          detailRequired: true,
+        }
+      - { value: flexible_timeline, label: Flexible timeline, excludes: [fixed_deadline] }
+      - { value: limited_capacity, label: Limited development team capacity }
+      - { value: tech_limits, label: Existing technical architecture or infrastructure limits }
+      - {
+          value: platform,
+          label: Specific platform requirements (iOS / Android),
+          detail: Which requirements?,
+        }
+      - { value: none, label: No known constraints, exclusive: true }
+      - { value: undetermined, label: Not yet determined, exclusive: true, unknown: true }
+    whenUnknown:
+      gap: Budget and timeline constraints are not known.
+      assumption: The assessment uses the baseline budget and the current sprint capacity.
+
+  - id: dependencies
+    section: feasibility
+    text: Are there any known dependencies or external factors that could affect implementation?
+    kind: multi
+    why: Dependencies add risk and lead time.
+    infoKind: confirmed
+    label: Known dependencies
+    options:
+      - { value: modify_existing, label: Existing game features or systems must change }
+      - { value: new_assets, label: 'New graphics, animations or audio are needed' }
+      - { value: backend, label: Backend or infrastructure changes are needed }
+      - { value: third_party, label: Third-party services or APIs are involved, detail: Which services? }
+      - { value: external_teams, label: External stakeholders or teams must be involved }
+      - { value: store_rules, label: App Store / Google Play requirements may apply }
+      - { value: none, label: No known dependencies, exclusive: true }
+      - {
+          value: pm_identify,
+          label: I need the PM team to identify dependencies,
+          exclusive: true,
+          unknown: true,
+        }
+    whenUnknown:
+      gap: The client knows no dependencies and asks the PM team to identify them.
+      assumption: Dependencies come from the impact analysis (AI hypothesis) and are confirmed by the development team.
+
+  - id: approval
+    section: decision_readiness
+    text: What is your current decision-making and approval status?
+    kind: single
+    why: The assessment ends in a decision; the right person must be able to make it.
+    infoKind: confirmed
+    label: Approval status
+    options:
+      - { value: full, label: 'I can approve the feature scope, budget and timeline', approval: full }
+      - {
+          value: scope_only,
+          label: I can approve the scope; budget and timeline need further approval,
+          approval: scope_only,
+        }
+      - {
+          value: requirements_only,
+          label: I provide the requirements; another stakeholder makes the final decision,
+          approval: none,
+          detail: Who makes the final decision?,
+        }
+      - {
+          value: initial_idea,
+          label: This is an initial idea and has not been formally approved,
+          approval: none,
+        }
+      - {
+          value: exploring,
+          label: We are exploring and need a feasibility assessment before deciding,
+          approval: none,
+        }
+
+# Contradictions the harness checks. `when` lists conditions that must all hold:
+# anyOf = the answer contains one of the values; noneOf = it contains none of them.
+# Blocking contradictions stop the pipeline until the client answers the clarification question.
+rules:
+  - id: critical_but_flexible_timeline
+    severity: blocking
+    when:
+      - { question: priority, anyOf: [critical] }
+      - { question: constraints, anyOf: [flexible_timeline] }
+    message: The feature is marked critical, but the timeline is flexible, so a schedule cannot be recommended yet.
+    clarify:
+      text: You marked the feature as critical but the timeline as flexible. Which is closer?
+      options:
+        - {
+            value: firm_date,
+            label: There is a firm date or release,
+            detail: Which date or release?,
+            fillsDetail: 'priority:critical',
+          }
+        - { value: important_flexible, label: 'It is important, but the date can move' }
+
+  - id: critical_fixed_budget_limited_capacity
+    severity: blocking
+    when:
+      - { question: priority, anyOf: [critical] }
+      - { question: constraints, anyOf: [fixed_budget] }
+      - { question: constraints, anyOf: [limited_capacity] }
+    message: Critical priority, a fixed budget and limited team capacity may not all fit; the trade-off is unknown.
+    clarify:
+      text: If the date, the budget and the team capacity cannot all be met, what may change first?
+      options:
+        - { value: reduce_scope, label: A smaller first release }
+        - { value: move_date, label: A later date }
+        - { value: add_budget, label: More budget }
+        - { value: reprioritize, label: Pause other planned work }
+
+  - id: not_urgent_but_fixed_date
+    severity: blocking
+    when:
+      - { question: priority, anyOf: [medium, low, exploratory] }
+      - { question: constraints, anyOf: [fixed_deadline] }
+    message: The priority says timing is flexible, but a fixed date is mentioned.
+    clarify:
+      text: You mentioned a fixed date, but a flexible priority. What does the date mean?
+      options:
+        - { value: date_is_firm, label: The date is firm; the feature must ship by then }
+        - { value: decision_date, label: 'It is the date we need a decision by, not the release date' }
+        - { value: date_can_move, label: The date can move }
+
+  - id: revenue_outcome_not_measured
+    severity: warning
+    when:
+      - { question: outcome, anyOf: [revenue] }
+      - { question: success, noneOf: [revenue, kpi_target, undefined] }
+    message: More revenue is the expected outcome, but revenue is not part of the success definition; the business case will track it anyway.
+
+  - id: monetization_without_revenue_outcome
+    severity: warning
+    when:
+      - { question: problem, anyOf: [monetization] }
+      - { question: outcome, noneOf: [revenue, undetermined] }
+    message: The feature is a monetization opportunity, but no revenue outcome is expected; the value model will check both.
+
+  - id: integration_without_dependencies
+    severity: warning
+    when:
+      - { question: first_release_scope, anyOf: [economy, notifications, integration] }
+      - { question: dependencies, anyOf: [none] }
+    message: The first release integrates with existing systems, but no dependencies are known; the impact analysis will look for them.
+
+  - id: fixed_budget_with_extras
+    severity: warning
+    when:
+      - { question: constraints, anyOf: [fixed_budget] }
+      - { question: first_release_scope, anyOf: [extras] }
+    message: The budget is fixed, but the first release includes extra functionality; the assessment will propose a smaller first release.
+
+  - id: critical_not_approved
+    severity: warning
+    when:
+      - { question: priority, anyOf: [critical] }
+      - { question: approval, anyOf: [initial_idea, exploring] }
+    message: The priority is critical, but the feature is not approved yet; the decision needs an approver soon.

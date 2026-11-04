@@ -1,14 +1,16 @@
-import { NOT_SURE, type Questionnaire, type RunEvent } from '@ai-pm/shared';
+import { type AnsweredQuestionnaire, NOT_SURE, type Questionnaire, type RunEvent } from '@ai-pm/shared';
 import { describe, expect, it } from 'vitest';
 import type {
+  DiscoveryReview,
   ElicitationResult,
-  ElicitationReview,
   ImpactAnalysis,
   RequirementsAnalysis,
 } from '../../agents/schemas.js';
 import type { AnalysisRepository, AnalysisToSave } from '../analysis-repository.js';
 import { requirementCodes } from '../analysis-repository.js';
 import type { ContextBuilder } from '../context.js';
+import { loadDiscoveryConfig, toUiQuestion } from '../discovery-config.js';
+import { clarificationQuestion } from '../discovery.js';
 import { classifyChange } from '../magnitude.js';
 import type { StageContext } from '../orchestrator.js';
 import type { RunRecord, RunRepository } from '../repository.js';
@@ -128,6 +130,23 @@ describe('prompt helpers', () => {
     expect(transcript([{ ...q, answers: { deadline: [NOT_SURE] } }])).toBe(
       'Q (deadline): Deadline?\nA: Not sure',
     );
+    expect(
+      transcript([
+        {
+          ...q,
+          answers: { deadline: ['fixed'] },
+          details: { 'deadline:fixed': '31 October' },
+          comment: 'For Halloween',
+        },
+      ]),
+    ).toBe(
+      'Q (deadline): Deadline?\nA: Fixed date (31 October)\n\nAdditional comments (round 1): For Halloween',
+    );
+  });
+
+  it('prefixes agent question ids so they never collide with discovery questions', () => {
+    const [q] = toQuestions([question('priority')], { prefix: 'feature_', section: 'feature' });
+    expect(q).toMatchObject({ id: 'feature_priority', section: 'feature' });
   });
 
   it('numbers requirement codes per type', () => {
@@ -154,44 +173,77 @@ const run: RunRecord = {
   updatedAt: new Date(),
 };
 
-const question = (id: string) => ({
-  id,
-  text: `${id}?`,
-  kind: 'single' as const,
-  options: [
-    { value: 'yes', label: 'Yes' },
-    { value: 'no', label: 'No' },
-  ],
-  why: 'It changes the estimate',
-  gap: id,
+function question(id: string) {
+  return {
+    id,
+    text: `${id}?`,
+    kind: 'single' as const,
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no', label: 'No' },
+    ],
+    why: 'It changes the estimate',
+    gap: id,
+  };
+}
+
+const config = loadDiscoveryConfig();
+
+/** Round 1 of the discovery questionnaire, answered consistently with evidence. */
+const discoveryRound = (overrides: Record<string, string[]> = {}): AnsweredQuestionnaire => ({
+  id: 'q1',
+  round: 1,
+  questions: config.questions.map(toUiQuestion),
+  answers: {
+    problem: ['retention'],
+    outcome: ['retention_d1_d7'],
+    evidence: ['analytics'],
+    audience: ['casual'],
+    first_release_scope: ['core', 'ui'],
+    success: ['retention'],
+    priority: ['high'],
+    constraints: ['flexible_budget'],
+    dependencies: ['modify_existing'],
+    approval: ['full'],
+    ...overrides,
+  },
 });
 
 function setup(
   agentAnswers: Record<string, unknown>,
-  state: { answered?: number; stageOutput?: unknown } = {},
+  state: {
+    answered?: AnsweredQuestionnaire[];
+    stageOutput?: unknown;
+    discoveryDecision?: { decision: string; comment: string | null };
+  } = {},
 ) {
   const events: RunEvent[] = [];
   const prompts: Record<string, string> = {};
   const saved: {
-    questionnaires: { round: number; ids: string[] }[];
+    questionnaires: { round: number; ids: string[]; sections?: string[] }[];
     analysis?: AnalysisToSave;
-    assumptions?: unknown;
+    assumptions?: { kind?: string }[];
   } = {
     questionnaires: [],
   };
-  const answered = Array.from({ length: state.answered ?? 0 }, (_, i) => ({
-    id: `q${i + 1}`,
-    round: i + 1,
-    questions: toQuestions([question('goal')]),
-    answers: { goal: ['yes'] },
-  }));
+  const answered = state.answered ?? [];
   const repo = {
     latestStageOutput: async () => state.stageOutput ?? null,
     answeredQuestionnaires: async () => answered,
-    latestDecision: async () => null,
-    async saveQuestionnaire(_runId: string, round: number, questions: { id: string }[]) {
-      saved.questionnaires.push({ round, ids: questions.map((q) => q.id) });
-      return { id: `q-${round}`, round, questions };
+    latestDecision: async (_id: string, gate = 'assessment') =>
+      gate === 'discovery' ? (state.discoveryDecision ?? null) : null,
+    async saveQuestionnaire(
+      _runId: string,
+      round: number,
+      questions: { id: string }[],
+      layout: Pick<Questionnaire, 'sections'> = {},
+    ) {
+      saved.questionnaires.push({
+        round,
+        ids: questions.map((q) => q.id),
+        ...(layout.sections ? { sections: layout.sections.map((s) => s.id) } : {}),
+      });
+      return { id: `q-${round}`, round, questions, ...layout };
     },
   } as unknown as RunRepository;
   const ctx: StageContext = {
@@ -211,8 +263,10 @@ function setup(
       url: 'https://x/browse/AIPM-40',
       note: 'I created a draft Epic in Jira: AIPM-40',
     }),
+    discovery: config,
     analysis: {
-      replaceElicitationAssumptions: async (_id: string, a: unknown) => void (saved.assumptions = a),
+      replaceElicitationAssumptions: async (_id: string, a: { kind?: string }[]) =>
+        void (saved.assumptions = a),
       elicitationAssumptions: async () => ['Assume iOS and Android (not sure)'],
       saveAnalysis: async (_id: string, a: AnalysisToSave) => {
         saved.analysis = a;
@@ -235,12 +289,12 @@ const elicitation: ElicitationResult = {
   summary: "Players race a transparent ghost of a friend's best run.",
   epicSummary: 'Ghost race against friends',
   candidateRequirements: [{ text: 'Show the ghost of a friend', type: 'functional', source: 'stated' }],
-  gaps: [{ topic: 'deadline', description: 'No deadline given', critical: true }],
-  questions: [question('goal'), question('deadline')],
+  gaps: [{ topic: 'netcode', description: 'Whether ghosts must sync live', critical: false }],
+  featureQuestions: [question('social'), question('connectivity'), question('extra')],
 };
 
 describe('intake stage', () => {
-  it('drafts the Epic, explains the idea back and sends the questionnaire', async () => {
+  it('drafts the Epic and sends the discovery questionnaire plus at most two feature questions', async () => {
     const { ctx, services, events, prompts, saved } = setup({ elicitation });
     const outcome = await intakeStage(services)(ctx);
 
@@ -248,44 +302,97 @@ describe('intake stage', () => {
     expect(prompts.elicitation).toContain(
       "<client_request>\nRace against a friend's ghost.\n</client_request>",
     );
-    expect(saved.questionnaires).toEqual([{ round: 1, ids: ['goal', 'deadline'] }]);
-    const message = events.find((e) => e.type === 'message');
-    expect(message).toMatchObject({ role: 'ai' });
-    expect((message as { text: string }).text).toContain('AIPM-40');
+    expect(prompts.elicitation).toContain('What is the basis for requesting this feature?');
+    const [sent] = saved.questionnaires;
+    expect(sent!.ids).toHaveLength(12);
+    expect(sent!.ids.slice(0, 3)).toEqual(['problem', 'outcome', 'evidence']);
+    // Feature questions sit after the scope section, before feasibility.
+    expect(sent!.ids.slice(6, 9)).toEqual(['feature_social', 'feature_connectivity', 'priority']);
+    expect(sent!.sections).toEqual([
+      'business_justification',
+      'product_context',
+      'scope',
+      'feature',
+      'feasibility',
+      'decision_readiness',
+    ]);
+    const message = events.find((e) => e.type === 'message') as { text: string };
+    expect(message.text).toContain('AIPM-40');
+    expect(message.text).toContain('Not yet determined');
     expect(events.at(-1)?.type).toBe('questionnaire');
   });
 });
 
-const review = (followUps: number, critical: boolean): ElicitationReview => ({
+const review = (extra: Partial<DiscoveryReview> = {}): DiscoveryReview => ({
+  summary: 'The request is clear: a ghost race for casual players, backed by analytics.',
   requirements: [{ text: 'Show the ghost of a friend', type: 'functional', source: 'answer' }],
-  assumptions: [{ text: 'Assume iOS and Android', reason: 'not sure about platforms' }],
-  remainingGaps: critical
-    ? [{ topic: 'netcode', description: 'Whether ghosts must sync live', critical: true }]
-    : [],
-  followUpQuestions: Array.from({ length: followUps }, (_, i) => question(`custom_${i + 1}`)),
+  findings: [{ kind: 'ai_hypothesis', area: 'feasibility', text: 'Ghosts need replay data', source: 'ai' }],
+  assumptions: [{ text: 'Ghosts replay offline', reason: 'inferred from the GDD', kind: 'ai_hypothesis' }],
+  gaps: [],
+  contradictions: [],
+  clarificationQuestions: [],
+  ...extra,
 });
 
-describe('eliciting stage', () => {
-  it('asks a follow-up round only for critical gaps, and only once', async () => {
-    const first = setup(
-      { 'elicitation-review': review(1, true) },
-      { answered: 1, stageOutput: { elicitation } },
+describe('discovery stage', () => {
+  it('passes a complete discovery to the analysis and publishes the report', async () => {
+    const { ctx, services, events, prompts, saved } = setup(
+      { 'discovery-review': review() },
+      { answered: [discoveryRound()], stageOutput: { elicitation } },
     );
-    expect((await elicitingStage(first.services)(first.ctx)).next).toBe('awaiting_answers');
-    expect(first.saved.questionnaires).toEqual([{ round: 2, ids: ['custom_1'] }]);
-    expect(first.saved.assumptions).toEqual([
-      { text: 'Assume iOS and Android', reason: 'not sure about platforms' },
-    ]);
+    const outcome = await elicitingStage(services)(ctx);
 
-    const second = setup({ 'elicitation-review': review(1, true) }, { answered: 2 });
-    expect((await elicitingStage(second.services)(second.ctx)).next).toBe('analyzing');
-    expect(second.prompts['elicitation-review']).toContain('This was the last round');
+    expect(outcome.next).toBe('analyzing');
+    expect(prompts['discovery-review']).toContain('What the completeness rules already found');
+    expect(prompts['discovery-review']).toContain('[client_assumption] Expected outcome');
+    const report = events.find((e) => e.type === 'discovery_report') as Extract<
+      RunEvent,
+      { type: 'discovery_report' }
+    >;
+    expect(report.report).toMatchObject({ result: 'complete', confidence: 'high' });
+    expect(saved.assumptions).toEqual([expect.objectContaining({ kind: 'ai_hypothesis' })]);
+    expect((events.at(-1) as { text: string }).text).toContain('Discovery is complete and consistent');
   });
 
-  it('moves on and lists the assumptions when nothing critical is left', async () => {
-    const { ctx, services, events } = setup({ 'elicitation-review': review(0, false) }, { answered: 1 });
-    expect((await elicitingStage(services)(ctx)).next).toBe('analyzing');
-    expect((events[0] as { text: string }).text).toContain('- Assume iOS and Android');
+  it('stops for clarification on a blocking contradiction and estimates nothing', async () => {
+    const { ctx, services, events, saved } = setup(
+      { 'discovery-review': review() },
+      {
+        answered: [
+          discoveryRound({ priority: ['critical'], constraints: ['fixed_budget', 'flexible_timeline'] }),
+        ],
+      },
+    );
+    expect((await elicitingStage(services)(ctx)).next).toBe('awaiting_answers');
+    expect(saved.questionnaires).toEqual([
+      { round: 2, ids: ['clarify_critical_but_flexible_timeline'], sections: ['clarification'] },
+    ]);
+    const message = events.find((e) => e.type === 'message') as { text: string };
+    expect(message.text).toContain("I won't estimate anything");
+  });
+
+  it('asks the client to decide after the last round, without more questions', async () => {
+    const rule = config.rules.find((r) => r.id === 'critical_but_flexible_timeline')!;
+    const { ctx, services, prompts, saved } = setup(
+      {
+        'discovery-review': review({ clarificationQuestions: [question('anything')] }),
+      },
+      {
+        answered: [
+          discoveryRound({ priority: ['critical'], constraints: ['flexible_timeline'] }),
+          {
+            id: 'q2',
+            round: 2,
+            questions: [clarificationQuestion(rule)],
+            answers: { clarify_critical_but_flexible_timeline: [NOT_SURE] },
+          },
+        ],
+      },
+    );
+    expect((await elicitingStage(services)(ctx)).next).toBe('awaiting_confirmation');
+    expect(prompts['discovery-review']).toContain('This was the last round');
+    expect(saved.questionnaires).toEqual([]);
+    expect(saved.assumptions).toContainEqual(expect.objectContaining({ kind: 'open_issue' }));
   });
 });
 
@@ -350,5 +457,46 @@ describe('analyzing stage', () => {
     expect(text).toContain('**2 requirements**: 1 functional, 1 non-functional; 2 in the MVP.');
     expect(text).toContain('**Core engine change.**');
     expect(text).toContain('Technical spike proposed: Can movement be replayed deterministically? (3 days).');
+  });
+
+  it('gives the analysts the discovery report and marks an accepted incomplete discovery preliminary', async () => {
+    const report = {
+      round: 2,
+      result: 'insufficient' as const,
+      confidence: 'low' as const,
+      confidenceReason: '1 unresolved contradiction.',
+      summary: 'Timing is unclear.',
+      coverage: [],
+      findings: [
+        {
+          kind: 'client_assumption' as const,
+          area: 'business_justification' as const,
+          text: 'Expected outcome: DAU (unvalidated client hypothesis: no supporting evidence)',
+          source: 'outcome',
+        },
+      ],
+      gaps: [],
+      contradictions: [
+        { id: 'x', text: 'Critical but flexible', severity: 'blocking' as const, resolved: false },
+      ],
+      readiness: { canApprove: 'full' as const, note: 'The client can approve.' },
+      nextAction: { action: 'client_decision' as const, text: 'Decide.' },
+    };
+    const { ctx, services, events, prompts, saved } = setup(
+      { 'requirements-analyst': analysis, 'impact-analyst': impact },
+      {
+        stageOutput: { review: review(), report },
+        discoveryDecision: { decision: 'proceed', comment: 'Go on' },
+      },
+    );
+    const outcome = await analyzingStage(services)(ctx);
+    expect(outcome.output).toMatchObject({ preliminary: true });
+    expect(saved.analysis).toBeDefined();
+    for (const agent of ['requirements-analyst', 'impact-analyst']) {
+      expect(prompts[agent]).toContain('# Discovery completeness report');
+      expect(prompts[agent]).toContain('## Client assumptions (expectations, not facts)');
+      expect(prompts[agent]).toContain('PRELIMINARY. Discovery is incomplete and the client accepted');
+    }
+    expect((events[0] as { text: string }).text).toContain('**Preliminary:**');
   });
 });

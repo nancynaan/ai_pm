@@ -1,5 +1,7 @@
-import type { ElicitationReview, ImpactAnalysis, RequirementsAnalysis } from '../../agents/schemas.js';
+import type { ImpactAnalysis, RequirementsAnalysis } from '../../agents/schemas.js';
+import { reportForPrompt } from '../discovery.js';
 import { classifyChange, MAGNITUDE_LABEL } from '../magnitude.js';
+import type { DiscoveryOutput } from './eliciting.js';
 import type { StageHandler } from '../orchestrator.js';
 import type { StageServices } from '../services.js';
 import { clientRequest, section, transcript } from './prompts.js';
@@ -14,10 +16,11 @@ const BASELINE_FOR_IMPACT = ['architecture_overview', 'game_design_document'];
 export function analyzingStage(services: StageServices): StageHandler {
   return async (ctx) => {
     const { run } = ctx;
-    const [review, answered, decision, backlog, components, texts] = await Promise.all([
-      ctx.repo.latestStageOutput(run.id, 'eliciting') as Promise<ElicitationReview | null>,
+    const [discovery, answered, decision, discoveryDecision, backlog, components, texts] = await Promise.all([
+      ctx.repo.latestStageOutput(run.id, 'eliciting') as Promise<Partial<DiscoveryOutput> | null>,
       ctx.repo.answeredQuestionnaires(run.id),
       ctx.repo.latestDecision(run.id),
+      ctx.repo.latestDecision(run.id, 'discovery'),
       services.context.backlog(),
       services.context.components(run.projectId),
       services.context.baselineTexts(run.projectId, [
@@ -25,13 +28,28 @@ export function analyzingStage(services: StageServices): StageHandler {
       ]),
     ]);
     const assumptions = await services.analysis.elicitationAssumptions(run.id);
+    const report = discovery?.report;
+    const preliminary =
+      report?.result === 'insufficient' ||
+      report?.confidence === 'low' ||
+      discoveryDecision?.decision === 'proceed';
 
     const common = [
       section('Feature request from the client', clientRequest(run.description)),
       section('Questionnaire answers', transcript(answered) || '(none)'),
+      ...(report ? [section('Discovery completeness report', reportForPrompt(report))] : []),
+      ...(preliminary
+        ? [
+            section(
+              'Assessment basis',
+              `PRELIMINARY. Discovery is incomplete${discoveryDecision?.decision === 'proceed' ? ' and the client accepted a preliminary assessment' : ''}${discoveryDecision?.comment ? ` (client comment: ${discoveryDecision.comment})` : ''}. Record every open point as an assumption.`,
+            ),
+          ]
+        : []),
       section(
         'Elicited requirements',
-        review?.requirements.map((r) => `- [${r.type}, ${r.source}] ${r.text}`).join('\n') ?? '(none)',
+        discovery?.review?.requirements.map((r) => `- [${r.type}, ${r.source}] ${r.text}`).join('\n') ??
+          '(none)',
       ),
       section('Assumptions so far', assumptions.map((a) => `- ${a}`).join('\n') || '(none)'),
       ...(decision?.decision === 'changes'
@@ -86,6 +104,9 @@ export function analyzingStage(services: StageServices): StageHandler {
       .map((i) => `${i.component} (${i.level})`);
     const blockingConflicts = analysis.conflicts.filter((c) => c.blocking);
     const lines = [
+      ...(preliminary
+        ? ['**Preliminary:** based on an incomplete discovery; open points are recorded as assumptions.']
+        : []),
       `**${reqs.length} requirements**: ${fr} functional, ${reqs.length - fr} non-functional; ${reqs.filter((r) => r.inMvp).length} in the MVP.`,
       `**${MAGNITUDE_LABEL[magnitude]}.** ${reason}`,
       ...(affected.length ? [`Most affected: ${affected.join(', ')}.`] : []),
@@ -105,7 +126,13 @@ export function analyzingStage(services: StageServices): StageHandler {
 
     return {
       next: 'estimating',
-      output: { requirements: reqs.length, magnitude, reason, conflicts: analysis.conflicts.length },
+      output: {
+        requirements: reqs.length,
+        magnitude,
+        reason,
+        conflicts: analysis.conflicts.length,
+        preliminary,
+      },
     };
   };
 }

@@ -1,4 +1,5 @@
 import {
+  type AnsweredQuestionnaire,
   type Questionnaire,
   questionnaireSchema,
   type RunEvent,
@@ -44,6 +45,16 @@ const runColumns = {
   createdAt: pipelineRuns.createdAt,
   updatedAt: pipelineRuns.updatedAt,
 };
+
+function toQuestionnaire(row: typeof questionnaires.$inferSelect): Questionnaire {
+  return questionnaireSchema.parse({
+    id: row.id,
+    round: row.round,
+    questions: row.questions,
+    ...(row.sections ? { sections: row.sections } : {}),
+    ...(row.allowComment ? { allowComment: true } : {}),
+  });
+}
 
 /** All database access of the harness. */
 export function createRunRepository(db: Db) {
@@ -206,9 +217,19 @@ export function createRunRepository(db: Db) {
       runId: string,
       round: number,
       questions: Questionnaire['questions'],
+      layout: Pick<Questionnaire, 'sections' | 'allowComment'> = {},
     ): Promise<Questionnaire> {
-      const [row] = await db.insert(questionnaires).values({ runId, round, questions }).returning();
-      return { id: row!.id, round, questions };
+      const [row] = await db
+        .insert(questionnaires)
+        .values({
+          runId,
+          round,
+          questions,
+          sections: layout.sections ?? null,
+          allowComment: layout.allowComment ?? false,
+        })
+        .returning();
+      return { id: row!.id, round, questions, ...layout };
     },
 
     async pendingQuestionnaire(runId: string): Promise<Questionnaire | null> {
@@ -218,12 +239,10 @@ export function createRunRepository(db: Db) {
         .where(and(eq(questionnaires.runId, runId), isNull(questionnaires.answeredAt)))
         .orderBy(desc(questionnaires.round))
         .limit(1);
-      return row
-        ? questionnaireSchema.parse({ id: row.id, round: row.round, questions: row.questions })
-        : null;
+      return row ? toQuestionnaire(row) : null;
     },
 
-    async answeredQuestionnaires(runId: string) {
+    async answeredQuestionnaires(runId: string): Promise<AnsweredQuestionnaire[]> {
       const rows = await db
         .select()
         .from(questionnaires)
@@ -232,15 +251,26 @@ export function createRunRepository(db: Db) {
       return rows
         .filter((r) => r.answers)
         .map((r) => ({
-          ...questionnaireSchema.parse({ id: r.id, round: r.round, questions: r.questions }),
+          ...toQuestionnaire(r),
           answers: r.answers ?? {},
+          details: r.details ?? {},
+          comment: r.comment,
         }));
     },
 
-    async saveAnswers(questionnaireId: string, answers: Record<string, string[]>) {
+    async saveAnswers(
+      questionnaireId: string,
+      answers: Record<string, string[]>,
+      extra: { details?: Record<string, string>; comment?: string | null } = {},
+    ) {
       await db
         .update(questionnaires)
-        .set({ answers, answeredAt: new Date() })
+        .set({
+          answers,
+          details: extra.details ?? null,
+          comment: extra.comment ?? null,
+          answeredAt: new Date(),
+        })
         .where(eq(questionnaires.id, questionnaireId));
     },
 
@@ -261,18 +291,27 @@ export function createRunRepository(db: Db) {
       return row?.output ?? null;
     },
 
-    async latestDecision(runId: string): Promise<{ decision: string; comment: string | null } | null> {
+    /** Latest client decision at a gate: the assessment (default) or the discovery check. */
+    async latestDecision(
+      runId: string,
+      gate: 'assessment' | 'discovery' = 'assessment',
+    ): Promise<{ decision: string; comment: string | null } | null> {
       const [row] = await db
         .select({ decision: decisions.decision, comment: decisions.comment })
         .from(decisions)
-        .where(eq(decisions.runId, runId))
+        .where(and(eq(decisions.runId, runId), eq(decisions.gate, gate)))
         .orderBy(desc(decisions.decidedAt))
         .limit(1);
       return row ?? null;
     },
 
-    async saveDecision(runId: string, decision: string, comment: string | undefined) {
-      await db.insert(decisions).values({ runId, decision, comment: comment ?? null });
+    async saveDecision(
+      runId: string,
+      decision: string,
+      comment: string | undefined,
+      gate: 'assessment' | 'discovery' = 'assessment',
+    ) {
+      await db.insert(decisions).values({ runId, gate, decision, comment: comment ?? null });
     },
 
     async baselineDigest(projectId: string | null): Promise<string | null> {

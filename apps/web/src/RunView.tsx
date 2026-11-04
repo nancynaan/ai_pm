@@ -1,5 +1,4 @@
 import {
-  type Questionnaire,
   type RunState,
   type RunSummary,
   runSummarySchema,
@@ -7,9 +6,10 @@ import {
   type StoredRunEvent,
   storedRunEventSchema,
 } from '@ai-pm/shared';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { api, errorText } from './api.js';
+import { DiscoveryDecisionCard, DiscoveryReportCard, QuestionnaireCard } from './Discovery.js';
 import { STATE_LABEL } from './labels.js';
 import { RichText } from './RichText.js';
 
@@ -18,6 +18,7 @@ const POSITION: Record<RunState, number> = {
   intake: 0,
   awaiting_answers: 1,
   eliciting: 1,
+  awaiting_confirmation: 1,
   analyzing: 2,
   estimating: 3,
   documenting: 4,
@@ -41,7 +42,8 @@ function stepStatus(index: number, run: RunSummary): StepStatus {
   if (index < at) return 'done';
   if (index > at) return 'pending';
   if (state === 'declined') return 'skipped';
-  if (state === 'awaiting_answers' || state === 'awaiting_decision') return 'waiting';
+  if (state === 'awaiting_answers' || state === 'awaiting_decision' || state === 'awaiting_confirmation')
+    return 'waiting';
   return 'active';
 }
 
@@ -67,6 +69,9 @@ export function RunView({ runId }: { runId: string }) {
     return () => source.close();
   }, [runId, refresh]);
 
+  // The discovery decision belongs to the latest report.
+  const lastReportId = [...events].reverse().find((e) => e.event.type === 'discovery_report')?.id;
+
   if (error) return <p className="error">Could not load the run: {error}</p>;
   if (!run) return <p className="muted">Loading…</p>;
 
@@ -89,11 +94,11 @@ export function RunView({ runId }: { runId: string }) {
 
       <section className="chat" aria-live="polite">
         {events.map((stored) => (
-          <EventItem key={stored.id} stored={stored} run={run} />
+          <EventItem key={stored.id} stored={stored} run={run} lastReportId={lastReportId} />
         ))}
         {run.state === 'completed' && <p className="banner ok">This feature request is complete.</p>}
         {run.state === 'declined' && (
-          <p className="banner">The feature was declined. Nothing was added to the backlog.</p>
+          <p className="banner">The feature request was stopped. Nothing was added to the backlog.</p>
         )}
         {run.state === 'failed' && <FailedBanner run={run} />}
       </section>
@@ -105,7 +110,15 @@ export function RunView({ runId }: { runId: string }) {
   );
 }
 
-function EventItem({ stored, run }: { stored: StoredRunEvent; run: RunSummary }) {
+function EventItem({
+  stored,
+  run,
+  lastReportId,
+}: {
+  stored: StoredRunEvent;
+  run: RunSummary;
+  lastReportId: number | undefined;
+}) {
   const { event } = stored;
   switch (event.type) {
     case 'message':
@@ -120,8 +133,18 @@ function EventItem({ stored, run }: { stored: StoredRunEvent; run: RunSummary })
         <QuestionnaireCard runId={run.id} questionnaire={event.questionnaire} />
       ) : (
         <p className="system">
-          Questionnaire with {event.questionnaire.questions.length} questions answered.
+          {event.questionnaire.round > 1 ? 'Clarification' : 'Questionnaire'} with{' '}
+          {event.questionnaire.questions.length} questions answered.
         </p>
+      );
+    case 'discovery_report':
+      return (
+        <>
+          <DiscoveryReportCard report={event.report} />
+          {run.state === 'awaiting_confirmation' && stored.id === lastReportId && (
+            <DiscoveryDecisionCard runId={run.id} />
+          )}
+        </>
       );
     case 'decision_requested':
       return (
@@ -142,69 +165,6 @@ function EventItem({ stored, run }: { stored: StoredRunEvent; run: RunSummary })
     case 'state':
       return null;
   }
-}
-
-function QuestionnaireCard({ runId, questionnaire }: { runId: string; questionnaire: Questionnaire }) {
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const complete = questionnaire.questions.every((q) => (answers[q.id]?.length ?? 0) > 0);
-
-  const toggle = (questionId: string, value: string, single: boolean) =>
-    setAnswers((prev) => {
-      const current = prev[questionId] ?? [];
-      const next = single
-        ? [value]
-        : current.includes(value)
-          ? current.filter((v) => v !== value)
-          : [...current, value];
-      return { ...prev, [questionId]: next };
-    });
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSending(true);
-    setError(null);
-    try {
-      await api(`/api/runs/${runId}/answers`, z.object({ ok: z.boolean() }), {
-        method: 'POST',
-        body: JSON.stringify({ questionnaireId: questionnaire.id, answers }),
-      });
-    } catch (err) {
-      setError(errorText(err));
-      setSending(false);
-    }
-  };
-
-  return (
-    <form className="card questionnaire" onSubmit={(e) => void submit(e)}>
-      <h3>A few questions</h3>
-      {questionnaire.questions.map((q) => (
-        <fieldset key={q.id}>
-          <legend>{q.text}</legend>
-          {q.why && <p className="muted small">{q.why}</p>}
-          {q.options.map((option) => (
-            <label key={option.value} className="option">
-              <input
-                type={q.kind === 'single' ? 'radio' : 'checkbox'}
-                name={q.id}
-                value={option.value}
-                checked={answers[q.id]?.includes(option.value) ?? false}
-                onChange={() => toggle(q.id, option.value, q.kind === 'single')}
-              />
-              {option.label}
-            </label>
-          ))}
-        </fieldset>
-      ))}
-      {error && <p className="error">{error}</p>}
-      <div className="actions">
-        <button type="submit" className="primary" disabled={!complete || sending}>
-          {sending ? 'Sending…' : 'Send answers'}
-        </button>
-      </div>
-    </form>
-  );
 }
 
 function DecisionCard({

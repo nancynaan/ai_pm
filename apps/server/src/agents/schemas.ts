@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 /**
  * Output schemas of the agents, referenced by name from agents/*.agent.md (`output:`). Limits that
- * matter to the process (at most 8 questions, known levels and categories) live here, so the
- * runner's repair loop enforces them.
+ * matter to the process (at most 2 feature questions, known levels and categories) live here, so
+ * the runner's repair loop enforces them.
  */
 
 const requirementType = z.enum(['functional', 'non_functional']);
@@ -42,12 +42,27 @@ export const ElicitationResult = z.object({
       z.object({ text: z.string().min(5), type: requirementType, source: z.enum(['stated', 'inferred']) }),
     )
     .min(1),
-  gaps: z.array(gap),
-  questions: z.array(questionOut).min(1).max(8),
+  gaps: z.array(gap).describe('Feature-specific gaps the fixed discovery questionnaire does not cover'),
+  featureQuestions: z
+    .array(questionOut)
+    .max(2)
+    .describe('0–2 feature-specific questions; never repeat a topic of the discovery questionnaire'),
 });
 export type ElicitationResult = z.infer<typeof ElicitationResult>;
 
-export const ElicitationReview = z.object({
+const area = z.enum([
+  'business_justification',
+  'product_context',
+  'scope',
+  'feasibility',
+  'decision_readiness',
+]);
+
+export const DiscoveryReview = z.object({
+  summary: z
+    .string()
+    .min(20)
+    .describe('Overall result of the questionnaire in two or three plain sentences for the client'),
   requirements: z
     .array(
       z.object({
@@ -57,13 +72,40 @@ export const ElicitationReview = z.object({
       }),
     )
     .min(1),
+  findings: z
+    .array(
+      z.object({
+        kind: z.enum(['confirmed', 'client_assumption', 'ai_hypothesis', 'missing']),
+        area,
+        text: z.string().min(5),
+        source: z.enum(['description', 'comment', 'feature_question', 'clarification', 'ai']),
+      }),
+    )
+    .max(15)
+    .describe(
+      'Information the rules cannot classify: from the description, comments, feature questions, clarifications, and your own inferences (ai_hypothesis)',
+    ),
   assumptions: z
-    .array(z.object({ text: z.string().min(5), reason: z.string().min(3) }))
-    .describe('Every "not sure" answer becomes an assumption with the default the team will use'),
-  remainingGaps: z.array(gap),
-  followUpQuestions: z.array(questionOut).max(3).describe('Only for critical gaps; empty otherwise'),
+    .array(
+      z.object({
+        text: z.string().min(5),
+        reason: z.string().min(3),
+        kind: z.enum(['client_hypothesis', 'ai_hypothesis', 'default']),
+      }),
+    )
+    .describe('Defaults for "not sure" answers, client beliefs without evidence, and your inferences'),
+  gaps: z
+    .array(z.object({ area, text: z.string().min(5), critical: z.boolean() }))
+    .describe('Gaps the rules did not report. Critical only if the assessment is impossible without it.'),
+  contradictions: z
+    .array(z.object({ text: z.string().min(10), severity: z.enum(['blocking', 'warning']) }))
+    .describe('Contradictions the rules did not report, e.g. between the description and the answers'),
+  clarificationQuestions: z
+    .array(questionOut)
+    .max(3)
+    .describe('Only for your own blocking contradictions and critical gaps; empty otherwise'),
 });
-export type ElicitationReview = z.infer<typeof ElicitationReview>;
+export type DiscoveryReview = z.infer<typeof DiscoveryReview>;
 
 export const ISO_25010 = [
   'functional suitability',
@@ -148,7 +190,7 @@ export type ImpactAnalysis = z.infer<typeof ImpactAnalysis>;
 
 export const AGENT_SCHEMAS: Record<string, z.ZodType> = {
   ElicitationResult,
-  ElicitationReview,
+  DiscoveryReview,
   RequirementsAnalysis,
   ImpactAnalysis,
 };

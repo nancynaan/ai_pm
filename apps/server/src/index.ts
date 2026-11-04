@@ -17,6 +17,7 @@ import { createPgBossQueue } from './harness/queue.js';
 import { createRunRepository } from './harness/repository.js';
 import { createAgentAsker, createEpicDrafter, type StageServices } from './harness/services.js';
 import { analyzingStage } from './harness/stages/analyzing.js';
+import { loadDiscoveryConfig } from './harness/discovery-config.js';
 import { elicitingStage } from './harness/stages/eliciting.js';
 import { intakeStage } from './harness/stages/intake.js';
 import { placeholderStages } from './harness/stages/placeholder.js';
@@ -103,6 +104,8 @@ async function main() {
       atlassian: stageGateway,
       jiraProjectKey: config.atlassian.jiraProjectKey,
     }),
+    // Validated at startup: a broken questionnaire config stops the app instead of a run.
+    discovery: loadDiscoveryConfig(),
   };
 
   const orchestrator = createOrchestrator({
@@ -116,6 +119,7 @@ async function main() {
         autoApprove: config.pipeline.clientGateAutoApprove,
       }),
       intake: intakeStage(services),
+      // eliciting = the discovery completeness check
       eliciting: elicitingStage(services),
       analyzing: analyzingStage(services),
     },

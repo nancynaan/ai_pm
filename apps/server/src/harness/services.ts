@@ -8,6 +8,7 @@ import { createPublisher, isPlaceholder } from '../sync/publisher.js';
 import type { SyncLogStore } from '../sync/sync-log.js';
 import type { AnalysisRepository } from './analysis-repository.js';
 import type { ContextBuilder } from './context.js';
+import type { DiscoveryConfig } from './discovery-config.js';
 import type { StageContext } from './orchestrator.js';
 import type { RunRecord } from './repository.js';
 
@@ -24,6 +25,8 @@ export interface StageServices {
   createDraftEpic(run: RunRecord, epicSummary: string, summary: string): Promise<DraftEpic>;
   analysis: AnalysisRepository;
   context: ContextBuilder;
+  /** The discovery questionnaire and its completeness rules (config/discovery.yaml). */
+  discovery: DiscoveryConfig;
 }
 
 export function createAgentAsker(opts: {

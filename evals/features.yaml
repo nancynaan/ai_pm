@@ -1,38 +1,149 @@
-# Eval set v1: sample feature requests for Comet Run and the change magnitude a good analysis
-# should reach. Run with: docker compose exec app node apps/server/dist/evals/cli.js
+# Eval set v2: sample feature requests for Comet Run, how a client answers the discovery
+# questionnaire, and what a good pipeline should conclude.
+#
+#   expected   change magnitude after the analysis
+#   discovery  acceptable results of the first discovery check (the agent may add warnings, so
+#              "complete" features also accept "complete_with_assumptions")
+#   answers    the client's answers to the core questions; details are "question:option": text.
+#              Feature-specific and clarification questions get their first option.
+#
+# Run with: docker compose exec app node apps/server/dist/evals/cli.js [--only a,b]
 features:
   - id: halloween-skins
     expected: cosmetic
+    discovery: [complete, complete_with_assumptions]
     description: >-
       For Halloween I want spooky versions of all our characters — a pumpkin-head runner, a
       skeleton, a witch — sold in the store for gems for three weeks in October.
+    answers:
+      problem: [monetization]
+      outcome: [revenue]
+      evidence: [competitor]
+      audience: [payers]
+      first_release_scope: [core, ui, economy]
+      success: [revenue]
+      priority: [critical]
+      constraints: [fixed_deadline, fixed_budget]
+      dependencies: [new_assets, store_rules]
+      approval: [full]
+    details:
+      'priority:critical': Halloween update
+      'constraints:fixed_deadline': 1 October
+
   - id: neon-menu-theme
     expected: cosmetic
+    discovery: [complete, complete_with_assumptions]
     description: >-
       Players should be able to switch the menus and the HUD to a darker neon theme in the
       settings, because many play at night.
+    answers:
+      problem: [experience]
+      outcome: [satisfaction]
+      evidence: [reviews_social]
+      audience: [active]
+      first_release_scope: [ui]
+      success: [feedback]
+      priority: [medium]
+      constraints: [flexible_timeline, limited_capacity]
+      dependencies: [none]
+      approval: [scope_only]
+
+  # Business intuition only, KPI target without numbers, dependencies left to the PM team.
   - id: daily-login-calendar
     expected: feature_extension
+    discovery: [complete_with_assumptions]
     description: >-
       Add a 7-day login calendar: every day you open the game you get a coin reward that grows
       each day, and on day 7 a few gems. Missing a day starts it over.
+    answers:
+      problem: [retention]
+      outcome: [retention_d1_d7, dau]
+      evidence: [intuition]
+      audience: [casual]
+      first_release_scope: [core, ui, economy, notifications]
+      success: [kpi_target]
+      priority: [high]
+      constraints: [flexible_budget]
+      dependencies: [pm_identify]
+      approval: [full]
+
+  # Contradictory: critical priority, fixed budget, limited capacity and a flexible timeline.
   - id: weekly-leaderboard-rewards
     expected: feature_extension
+    discovery: [needs_clarification]
     description: >-
       At the end of each week, the top 100 players on the weekly leaderboard should get an
       exclusive skin and some gems, so competitive players have something to chase.
+    answers:
+      problem: [engagement]
+      outcome: [session_length, sessions_per_player]
+      evidence: [analytics]
+      audience: [highly_engaged]
+      first_release_scope: [core, ui, economy]
+      success: [engagement]
+      priority: [critical]
+      constraints: [fixed_budget, limited_capacity, flexible_timeline]
+      dependencies: [backend]
+      approval: [full]
+    details:
+      'priority:critical': Season 3 launch
+
   - id: ghost-race
     expected: core_engine
+    discovery: [complete, complete_with_assumptions]
     description: >-
       I want players to race against the "ghost" of a friend's best run, shown as a transparent
       runner in the same level, so they can compete without playing at the same time.
+    answers:
+      problem: [engagement]
+      outcome: [sessions_per_player]
+      evidence: [player_requests]
+      audience: [highly_engaged]
+      first_release_scope: [core, ui, integration]
+      success: [engagement, adoption]
+      priority: [exploratory]
+      constraints: [tech_limits]
+      dependencies: [backend, modify_existing]
+      approval: [exploring]
+
+  # Mostly unknown: no evidence, no scope, no success criteria, no constraints known.
   - id: double-jump
     expected: core_engine
+    discovery: [complete_with_assumptions]
     description: >-
       Let players buy a double-jump upgrade: after jumping they can jump once more in the air,
       which opens new routes over tall obstacles.
+    answers:
+      problem: [monetization]
+      outcome: [revenue]
+      evidence: [no_evidence]
+      audience: [all]
+      first_release_scope: [undefined]
+      success: [undefined]
+      priority: [high]
+      constraints: [undetermined]
+      dependencies: [pm_identify]
+      approval: [requirements_only]
+    details:
+      'approval:requirements_only': Head of product
+
   - id: cloud-save
     expected: core_engine
+    discovery: [complete, complete_with_assumptions]
     description: >-
       Players lose everything when they change phones. I want cloud save so progress, coins and
       skins carry over to a new device automatically.
+    answers:
+      problem: [retention]
+      outcome: [retention_d1_d7]
+      evidence: [player_requests, reviews_social]
+      audience: [all]
+      first_release_scope: [core, ui, integration]
+      success: [stability, retention]
+      priority: [high]
+      constraints: [platform]
+      dependencies: [backend, third_party]
+      approval: [full]
+    details:
+      'constraints:platform': Sign in with Apple and Google accounts
+      'dependencies:third_party': Apple and Google sign-in

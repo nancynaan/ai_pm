@@ -18,7 +18,9 @@ export const isFinal = (state: RunState) => state === 'completed' || state === '
 const TRANSITIONS: Record<RunState, readonly RunState[]> = {
   intake: ['awaiting_answers'],
   awaiting_answers: ['eliciting'],
-  eliciting: ['awaiting_answers', 'analyzing'],
+  // Discovery check: clarification round, client decision on a preliminary assessment, or go on.
+  eliciting: ['awaiting_answers', 'awaiting_confirmation', 'analyzing'],
+  awaiting_confirmation: ['analyzing', 'declined'],
   analyzing: ['estimating'],
   estimating: ['documenting'],
   documenting: ['presenting'],
