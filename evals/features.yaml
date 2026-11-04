@@ -1,0 +1,38 @@
+# Eval set v1: sample feature requests for Comet Run and the change magnitude a good analysis
+# should reach. Run with: docker compose exec app node apps/server/dist/evals/cli.js
+features:
+  - id: halloween-skins
+    expected: cosmetic
+    description: >-
+      For Halloween I want spooky versions of all our characters — a pumpkin-head runner, a
+      skeleton, a witch — sold in the store for gems for three weeks in October.
+  - id: neon-menu-theme
+    expected: cosmetic
+    description: >-
+      Players should be able to switch the menus and the HUD to a darker neon theme in the
+      settings, because many play at night.
+  - id: daily-login-calendar
+    expected: feature_extension
+    description: >-
+      Add a 7-day login calendar: every day you open the game you get a coin reward that grows
+      each day, and on day 7 a few gems. Missing a day starts it over.
+  - id: weekly-leaderboard-rewards
+    expected: feature_extension
+    description: >-
+      At the end of each week, the top 100 players on the weekly leaderboard should get an
+      exclusive skin and some gems, so competitive players have something to chase.
+  - id: ghost-race
+    expected: core_engine
+    description: >-
+      I want players to race against the "ghost" of a friend's best run, shown as a transparent
+      runner in the same level, so they can compete without playing at the same time.
+  - id: double-jump
+    expected: core_engine
+    description: >-
+      Let players buy a double-jump upgrade: after jumping they can jump once more in the air,
+      which opens new routes over tall obstacles.
+  - id: cloud-save
+    expected: core_engine
+    description: >-
+      Players lose everything when they change phones. I want cloud save so progress, coins and
+      skins carry over to a new device automatically.

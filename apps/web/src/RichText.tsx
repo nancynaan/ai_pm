@@ -1,6 +1,23 @@
 import { Fragment, type ReactNode } from 'react';
 
-/** Tiny, safe renderer for chat text: paragraphs, "- " lists and **bold**. No HTML is injected. */
+/** Tiny, safe renderer for chat text: paragraphs, "- " lists, **bold** and links. No HTML is injected. */
+function links(text: string, key: number): ReactNode {
+  const parts = text.split(/(https?:\/\/[^\s)]+)/g);
+  return (
+    <Fragment key={key}>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noreferrer">
+            {part}
+          </a>
+        ) : (
+          part
+        ),
+      )}
+    </Fragment>
+  );
+}
+
 function inline(text: string): ReactNode[] {
   return text
     .split(/(\*\*[^*]+\*\*)/g)
@@ -8,7 +25,7 @@ function inline(text: string): ReactNode[] {
       part.startsWith('**') && part.endsWith('**') ? (
         <strong key={i}>{part.slice(2, -2)}</strong>
       ) : (
-        <Fragment key={i}>{part}</Fragment>
+        links(part, i)
       ),
     );
 }

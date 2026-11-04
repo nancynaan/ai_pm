@@ -32,6 +32,31 @@ export type JiraIssueRef = z.infer<typeof issueRefSchema>;
 
 const searchSchema = z.object({ issues: z.array(issueRefSchema) });
 
+const named = z.object({ name: z.string() }).nullish();
+const backlogSearchSchema = z.object({
+  issues: z.array(
+    z.object({
+      key: z.string(),
+      fields: z.object({
+        summary: z.string(),
+        issuetype: named,
+        status: named,
+        components: z.array(z.object({ name: z.string() })).nullish(),
+        parent: z.object({ key: z.string() }).nullish(),
+      }),
+    }),
+  ),
+});
+
+export interface BacklogIssue {
+  key: string;
+  summary: string;
+  type: string;
+  status: string;
+  components: string[];
+  parent: string | null;
+}
+
 const statusCategory = z.object({ key: z.string() });
 const issueStatusSchema = z.object({
   fields: z.object({ status: z.object({ name: z.string(), statusCategory }) }),
@@ -133,6 +158,24 @@ export function jiraApi(http: AtlassianHttp) {
     async search(jql: string): Promise<JiraIssueRef[]> {
       const body = { jql, fields: ['summary'], maxResults: 100 };
       return searchSchema.parse(await http.post('/rest/api/3/search/jql', { body })).issues;
+    },
+
+    /** Epics and stories with the fields the analysis needs (up to 200). */
+    async searchBacklog(jql: string): Promise<BacklogIssue[]> {
+      const body = {
+        jql,
+        fields: ['summary', 'issuetype', 'status', 'components', 'parent'],
+        maxResults: 200,
+      };
+      const page = backlogSearchSchema.parse(await http.post('/rest/api/3/search/jql', { body }));
+      return page.issues.map(({ key, fields }) => ({
+        key,
+        summary: fields.summary,
+        type: fields.issuetype?.name ?? 'Issue',
+        status: fields.status?.name ?? 'Unknown',
+        components: fields.components?.map((c) => c.name) ?? [],
+        parent: fields.parent?.key ?? null,
+      }));
     },
 
     async createIssue(fields: Record<string, unknown>): Promise<JiraIssueRef> {

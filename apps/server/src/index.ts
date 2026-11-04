@@ -1,20 +1,30 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { FastifyServerOptions } from 'fastify';
+import { loadAgentDefinitions } from './agents/registry.js';
+import { createAgentRunner } from './agents/runner.js';
+import { AGENT_SCHEMAS } from './agents/schemas.js';
 import { buildApp } from './app.js';
 import { readBaselineSummary } from './baseline/store.js';
 import { type AppConfig, atlassianCredentials, ConfigError, loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 import { runMigrations, waitForDatabase } from './db/migrate.js';
+import { createAnalysisRepository } from './harness/analysis-repository.js';
+import { createContextBuilder } from './harness/context.js';
 import { createEventBus } from './harness/events.js';
 import { createOrchestrator } from './harness/orchestrator.js';
 import { createPgBossQueue } from './harness/queue.js';
 import { createRunRepository } from './harness/repository.js';
+import { createAgentAsker, createEpicDrafter, type StageServices } from './harness/services.js';
+import { analyzingStage } from './harness/stages/analyzing.js';
+import { elicitingStage } from './harness/stages/eliciting.js';
+import { intakeStage } from './harness/stages/intake.js';
 import { placeholderStages } from './harness/stages/placeholder.js';
 import { buildProbes } from './health/checks.js';
 import { createAtlassianGateway } from './integrations/atlassian/index.js';
 import { createClaudeCli } from './integrations/claude-cli.js';
 import { createMailer } from './integrations/mailer.js';
+import { drizzleSyncLog } from './sync/sync-log.js';
 
 function loggerOptions(config: AppConfig): FastifyServerOptions['logger'] {
   return {
@@ -67,15 +77,48 @@ async function main() {
   await runMigrations(db);
   app.log.info('database migrations applied');
 
+  // Real stages (Phase 3+); in dry-run the gateway refuses every write as a second safety net.
+  const stageGateway =
+    credentials &&
+    createAtlassianGateway(credentials, { readOnly: config.atlassian.writeMode === 'dry-run' });
+  const analysis = createAnalysisRepository(db);
+  const definitions = loadAgentDefinitions();
+  app.log.info({ agents: [...definitions.keys()] }, 'agent definitions loaded');
+  const services: StageServices = {
+    ask: createAgentAsker({
+      runner: createAgentRunner({ claude }),
+      definitions,
+      schemas: AGENT_SCHEMAS,
+      defaultModel: config.claude.model,
+    }),
+    createDraftEpic: createEpicDrafter({
+      config,
+      atlassian: stageGateway,
+      store: drizzleSyncLog(db),
+      analysis,
+    }),
+    analysis,
+    context: createContextBuilder({
+      db,
+      atlassian: stageGateway,
+      jiraProjectKey: config.atlassian.jiraProjectKey,
+    }),
+  };
+
   const orchestrator = createOrchestrator({
     repo,
     bus,
     queue: createPgBossQueue(config.databaseUrl, (err) => app.log.error({ err }, 'job queue error')),
     pool,
-    handlers: placeholderStages({
-      delayMs: config.pipeline.placeholderDelayMs,
-      autoApprove: config.pipeline.clientGateAutoApprove,
-    }),
+    handlers: {
+      ...placeholderStages({
+        delayMs: config.pipeline.placeholderDelayMs,
+        autoApprove: config.pipeline.clientGateAutoApprove,
+      }),
+      intake: intakeStage(services),
+      eliciting: elicitingStage(services),
+      analyzing: analyzingStage(services),
+    },
     log: app.log,
   });
   pipeline.orchestrator = orchestrator;

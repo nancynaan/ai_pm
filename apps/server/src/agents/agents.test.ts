@@ -81,6 +81,13 @@ describe('agent runner', () => {
     expect(calls[0]?.status).toBe('limit_reached');
   });
 
+  it('recognizes the subscription limit wording as a pause', async () => {
+    const { runner } = runnerWith(
+      envelope({ is_error: true, result: "You've hit your 5-hour limit · resets 7:40pm (America/New_York)" }),
+    );
+    await expect(runner.run(spec, 'x')).rejects.toBeInstanceOf(UsageLimitReached);
+  });
+
   it('explains a rejected login', async () => {
     const { runner } = runnerWith(
       envelope({

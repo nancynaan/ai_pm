@@ -39,6 +39,7 @@ COPY agents agents
 COPY skills skills
 COPY config config
 COPY seed seed
+COPY evals evals
 USER node
 EXPOSE 3000
 CMD ["node", "apps/server/dist/index.js"]

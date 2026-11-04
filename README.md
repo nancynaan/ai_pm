@@ -11,7 +11,7 @@ An AI pipeline that does project-management work for a Scrum game project (an en
 
 It also emails the team before sprint events. Everything runs locally with Docker Compose, and all data is kept in PostgreSQL.
 
-> **Status:** Phase 2 of 10. The pipeline runs end to end in the chat UI with placeholder stages; the real agents arrive in Phases 3–7.
+> **Status:** Phase 3 of 10. Intake, the questionnaire and the requirements and impact analysis run with real Claude agents; the later stages are still placeholders.
 
 ## Prerequisites
 
@@ -91,10 +91,21 @@ The status page lists the baseline documents with links to Confluence.
 
 Open <http://localhost:3000>, describe a feature as the client and send it. The AI PM asks a short questionnaire, shows progress through the stages, and asks for your decision (approve, request changes or decline). Runs survive restarts: a stage that was cut off is retried when the app comes back. **System status** is the second tab.
 
+With `ATLASSIAN_WRITE_MODE=live`, intake also creates a draft Epic in Jira (labels `ai-pm`, `ai-pm-draft`). One assessment takes a few minutes and uses your Claude subscription (several Opus calls).
+
 To check that Claude works through your subscription, make one small real call:
 
 ```bash
 docker compose exec app node apps/server/dist/agents/smoke-cli.js
+```
+
+## Evals
+
+[evals/features.yaml](evals/features.yaml) holds sample feature requests with the change magnitude a good analysis should reach (UI-only, feature extension, core engine). The eval runs each one through the real intake, elicitation and analysis stages, without writing to Jira:
+
+```bash
+docker compose exec app node apps/server/dist/evals/cli.js            # all features (about 30 minutes)
+docker compose exec app node apps/server/dist/evals/cli.js --only ghost-race
 ```
 
 ## Development

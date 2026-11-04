@@ -52,4 +52,6 @@ docker compose up --build  # full stack: http://localhost:3000, Mailpit http://l
 - Phase 0 (foundations) is done: workspaces, Docker Compose, config, migrations, and `/api/health`.
 - Phase 1 (Atlassian gateway and baseline seed) is done and seeded live.
 - Phase 2 (harness core) is done: runs go intake → completed with placeholder stages, survive a crash (interrupted attempts are retried), and stream events to the chat UI. `node apps/server/dist/agents/smoke-cli.js` makes one real Claude call.
-- Next is Phase 3: intake and analysis with real agents (draft Epic, elicitation and question bank, requirements and impact analysis).
+- Phase 3 (intake and analysis) is done: real agents for elicitation (question bank, at most 8 questions, one follow-up round for critical gaps), requirements analysis and impact analysis; draft Epic at intake; change-magnitude rule in `harness/magnitude.ts`; eval set in `evals/features.yaml` (`node apps/server/dist/evals/cli.js`).
+- Eval status: first full run 3/7 (over-classification). After the calibration fix (low impacts never escalate; calibration table in skills/impact-analysis) the cosmetic cases pass; daily-login-calendar, weekly-leaderboard-rewards and a ghost-race control still need a re-run (stopped by the subscription limit).
+- Next is Phase 4: estimation, value and risk (story map, calculators, verdict).

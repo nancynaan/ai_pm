@@ -65,7 +65,7 @@ const envelopeSchema = z.looseObject({
 });
 type Envelope = z.infer<typeof envelopeSchema>;
 
-const LIMIT_PATTERN = /usage limit|rate limit|limit reached|too many requests/i;
+const LIMIT_PATTERN = /usage limit|rate limit|limit reached|too many requests|hit your [^.]*limit/i;
 
 /** "Claude AI usage limit reached|1767225600" carries the reset time as Unix seconds. */
 function resumeTime(text: string): Date | null {
@@ -103,7 +103,12 @@ export function createAgentRunner({
   maxRepairs = 2,
   timeoutMs = 10 * 60_000,
 }: AgentRunnerOptions) {
-  async function callOnce<T>(spec: AgentSpec<T>, prompt: string, systemPromptFile: string) {
+  async function callOnce<T>(
+    spec: AgentSpec<T>,
+    prompt: string,
+    systemPromptFile: string,
+    recordCall: AgentRunnerOptions['record'],
+  ) {
     const args = [
       '--system-prompt-file',
       systemPromptFile,
@@ -133,7 +138,7 @@ export function createAgentRunner({
       envelope = envelopeSchema.parse(JSON.parse(stdout));
     } catch {
       const detail = (stderr || stdout).trim().slice(0, 500) || 'no output';
-      await record?.({ ...base, inputTokens: null, outputTokens: null, status: 'error', error: detail });
+      await recordCall?.({ ...base, inputTokens: null, outputTokens: null, status: 'error', error: detail });
       throw new AgentCallFailed(`claude -p returned no result envelope: ${detail}`);
     }
     const usage = envelope.usage;
@@ -149,22 +154,28 @@ export function createAgentRunner({
   }
 
   return {
-    async run<T>(spec: AgentSpec<T>, prompt: string): Promise<T> {
+    /** `onCall` overrides the runner-wide recorder, e.g. to tie calls to a run and stage. */
+    async run<T>(
+      spec: AgentSpec<T>,
+      prompt: string,
+      options: { onCall?: AgentRunnerOptions['record'] } = {},
+    ): Promise<T> {
+      const recordCall = options.onCall ?? record;
       const dir = await mkdtemp(join(tmpdir(), 'aipm-agent-'));
       const systemPromptFile = join(dir, 'system-prompt.md');
       await writeFile(systemPromptFile, spec.systemPrompt, 'utf8');
       try {
         let currentPrompt = prompt;
         for (let attempt = 0; ; attempt++) {
-          const { envelope, base } = await callOnce(spec, currentPrompt, systemPromptFile);
+          const { envelope, base } = await callOnce(spec, currentPrompt, systemPromptFile, recordCall);
           const text = envelope.result ?? '';
 
           if (envelope.is_error) {
             if (envelope.api_error_status === 429 || LIMIT_PATTERN.test(text)) {
-              await record?.({ ...base, status: 'limit_reached', error: text.slice(0, 500) });
+              await recordCall?.({ ...base, status: 'limit_reached', error: text.slice(0, 500) });
               throw new UsageLimitReached(text || 'Claude usage limit reached', resumeTime(text));
             }
-            await record?.({ ...base, status: 'error', error: text.slice(0, 500) });
+            await recordCall?.({ ...base, status: 'error', error: text.slice(0, 500) });
             if (envelope.api_error_status === 401) {
               throw new AgentCallFailed(
                 'Claude rejected the login (401). Run "claude setup-token" and put the token in .env as CLAUDE_CODE_OAUTH_TOKEN.',
@@ -177,14 +188,14 @@ export function createAgentRunner({
           try {
             const parsed = spec.schema.safeParse(parseAnswer(envelope));
             if (parsed.success) {
-              await record?.({ ...base, status: 'ok', error: null });
+              await recordCall?.({ ...base, status: 'ok', error: null });
               return parsed.data;
             }
             problem = z.prettifyError(parsed.error);
           } catch {
             problem = 'The answer was not valid JSON.';
           }
-          await record?.({ ...base, status: 'invalid_output', error: problem.slice(0, 500) });
+          await recordCall?.({ ...base, status: 'invalid_output', error: problem.slice(0, 500) });
           if (attempt >= maxRepairs) {
             throw new AgentCallFailed(`${spec.name} kept returning invalid output: ${problem.slice(0, 300)}`);
           }

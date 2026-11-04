@@ -244,6 +244,33 @@ export function createRunRepository(db: Db) {
         .where(eq(questionnaires.id, questionnaireId));
     },
 
+    /** Output of the stage's latest successful attempt. */
+    async latestStageOutput(runId: string, stage: RunState): Promise<unknown> {
+      const [row] = await db
+        .select({ output: stageExecutions.output })
+        .from(stageExecutions)
+        .where(
+          and(
+            eq(stageExecutions.runId, runId),
+            eq(stageExecutions.stage, stage),
+            eq(stageExecutions.status, 'succeeded'),
+          ),
+        )
+        .orderBy(desc(stageExecutions.startedAt))
+        .limit(1);
+      return row?.output ?? null;
+    },
+
+    async latestDecision(runId: string): Promise<{ decision: string; comment: string | null } | null> {
+      const [row] = await db
+        .select({ decision: decisions.decision, comment: decisions.comment })
+        .from(decisions)
+        .where(eq(decisions.runId, runId))
+        .orderBy(desc(decisions.decidedAt))
+        .limit(1);
+      return row ?? null;
+    },
+
     async saveDecision(runId: string, decision: string, comment: string | undefined) {
       await db.insert(decisions).values({ runId, decision, comment: comment ?? null });
     },

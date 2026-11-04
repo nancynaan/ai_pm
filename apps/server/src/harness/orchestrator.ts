@@ -8,6 +8,8 @@ import { ACTIVE_STATES, assertTransition, isActive, stateAfterDecision } from '.
 
 export interface StageContext {
   run: RunRecord;
+  /** The stage attempt; Claude calls are recorded against it. */
+  executionId: string;
   repo: RunRepository;
   baselineDigest: string | null;
   emit: (event: RunEvent) => Promise<void>;
@@ -107,7 +109,7 @@ export function createOrchestrator(opts: OrchestratorOptions) {
 
       try {
         const baselineDigest = await repo.baselineDigest(run.projectId);
-        const outcome = await handler({ run, repo, baselineDigest, emit });
+        const outcome = await handler({ run, executionId: execution.id, repo, baselineDigest, emit });
         assertTransition(stage, outcome.next);
         await repo.finishExecution(execution.id, 'succeeded', { output: outcome.output });
         await emit({ type: 'stage', stage, status: 'completed' });

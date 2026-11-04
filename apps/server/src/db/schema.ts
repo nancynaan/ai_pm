@@ -1,4 +1,14 @@
-import { bigserial, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigserial,
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -69,6 +79,8 @@ export const featureRequests = pgTable('feature_requests', {
   projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
   description: text('description').notNull(),
+  /** The draft Epic created at intake (null in dry-run). */
+  epicKey: text('epic_key'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -156,4 +168,99 @@ export const decisions = pgTable('decisions', {
   decision: text('decision').notNull(),
   comment: text('comment'),
   decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Requirements from the analysis stage, with stable codes (REQ-FR-001, REQ-NFR-001). */
+export const requirements = pgTable('requirements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('run_id')
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  code: text('code').notNull(),
+  /** functional | non_functional */
+  type: text('type').notNull(),
+  /** ISO/IEC 25010 characteristic for NFRs, functional area for FRs. */
+  category: text('category').notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  /** must | should | could | wont */
+  moscow: text('moscow').notNull(),
+  inMvp: boolean('in_mvp').notNull(),
+  /** stated | answer | inferred */
+  source: text('source').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const requirementConflicts = pgTable('requirement_conflicts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('run_id')
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  requirementCode: text('requirement_code'),
+  /** What it conflicts with or duplicates: a baseline document, a backlog issue key, … */
+  withRef: text('with_ref').notNull(),
+  /** conflict | duplicate */
+  kind: text('kind').notNull(),
+  description: text('description').notNull(),
+  blocking: boolean('blocking').notNull(),
+  resolutionOptions: jsonb('resolution_options').$type<string[]>().notNull().default([]),
+});
+
+export const assumptions = pgTable('assumptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('run_id')
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  text: text('text').notNull(),
+  /** elicitation (e.g. a "not sure" answer) | analysis */
+  source: text('source').notNull(),
+  owner: text('owner'),
+  status: text('status').notNull().default('open'),
+});
+
+export const constraints = pgTable('constraints', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('run_id')
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  /** time | budget | platform | technical | compliance | other */
+  type: text('type').notNull(),
+  text: text('text').notNull(),
+});
+
+export const componentImpacts = pgTable('component_impacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('run_id')
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  component: text('component').notNull(),
+  /** none | low | medium | high */
+  level: text('level').notNull(),
+  rationale: text('rationale').notNull(),
+});
+
+export const dependencies = pgTable('dependencies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('run_id')
+    .notNull()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  /** component | sdk | epic | team | external */
+  type: text('type').notNull(),
+  target: text('target').notNull(),
+  description: text('description').notNull(),
+  blocking: boolean('blocking').notNull(),
+});
+
+/** One row per run: the analysis verdicts that later stages read. */
+export const featureAnalyses = pgTable('feature_analyses', {
+  runId: uuid('run_id')
+    .primaryKey()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  /** cosmetic | feature_extension | core_engine */
+  magnitude: text('magnitude').notNull(),
+  magnitudeReason: text('magnitude_reason').notNull(),
+  mvpSummary: text('mvp_summary').notNull(),
+  spike: jsonb('spike').$type<{ needed: boolean; question?: string; timeboxDays?: number }>().notNull(),
+  performanceRisks: jsonb('performance_risks').$type<string[]>().notNull().default([]),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
