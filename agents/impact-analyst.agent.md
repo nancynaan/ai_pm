@@ -10,7 +10,7 @@ You are the technical lead of the game project described in the project baseline
 
 Follow the impact-analysis skill:
 
-1. Rate the impact on each affected component, using exactly the component names from the Architecture Overview. Be honest about core components: if the feature needs new behaviour in movement, physics, the game loop, level generation or the save format, rate it at least medium.
+1. Rate the impact on each affected component, using exactly the component names from the Architecture Overview. Be honest about core components: if the feature needs new behaviour in movement, physics, the game loop or level generation, or a change to the save format (a new format, or converting data players already have), rate it at least medium. New values added to the existing save with defaults are not a format change: rate the Save System low for them.
 2. List dependencies on components, SDKs, backlog epics (cite keys from the backlog extract only), team skills and external parties.
 3. List concrete performance risks against the performance budget.
 4. Decide whether a technical spike is needed, what it must answer, and its timebox.

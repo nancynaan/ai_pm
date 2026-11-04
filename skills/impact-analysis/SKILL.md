@@ -23,7 +23,8 @@ Rate what the feature changes in each component, not how important the feature i
 | New skins or offers added to the existing catalog and store                     | Characters & Skins medium or high; Economy & Store **low** |
 | Time-limited availability using existing remote config or live-ops              | Live-ops **low**                                           |
 | A new setting, a streak counter or a few new values stored in the existing save | Save System **low**                                        |
-| A new kind of progress that needs a save migration                              | Save System medium                                         |
+| A calendar, streak or progress track whose state is new fields with defaults    | Save System **low** (no existing data changes)             |
+| Existing saved data must be converted or restructured (a real migration)        | Save System medium                                         |
 | Cloud save, cross-device sync, a new save format                                | Save System high                                           |
 | Granting coins, gems or items through the existing wallet                       | Economy & Store **low**                                    |
 | Reading results the game loop already produces (score, distance, coins)         | Game Loop **low**                                          |
@@ -36,7 +37,7 @@ Rate what the feature changes in each component, not how important the feature i
 ## Typical signals
 
 - **Physics & Movement / Game Loop / Level Generator:** new player abilities, replays or ghosts, changed collisions, new run modes, multiplayer synchronization, determinism.
-- **Save System:** anything persisted in a new way: cloud save, new progress types, migrations.
+- **Save System:** medium or high only when persistence itself changes: cloud save, a new format, converting existing data. Adding fields with defaults (counters, dates, claimed flags) is low; the Definition of Done's compatibility check covers it.
 - **Backend:** server state, leaderboards, friends, receipts, events, anything shared between players.
 - **Rendering & VFX:** new visual effects, shaders, more objects on screen — always check the frame-time budget on low-end devices.
 - **UI & HUD / Characters & Skins / Audio:** screens, skins, sounds; cosmetic unless they need new systems.

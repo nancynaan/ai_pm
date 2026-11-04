@@ -188,6 +188,14 @@ async function main() {
           .map((i) => `${i.component} ${i.level}`)
           .join(', ');
         console.log(`    impacts: ${impacts}`);
+        if (!result.ok) {
+          // Why the model rated the deciding components as it did, to tell a prompt gap from a fair call.
+          for (const i of saved.impact.componentImpacts.filter(
+            (x) => x.level === 'medium' || x.level === 'high',
+          )) {
+            console.log(`    why ${i.component} ${i.level}: ${i.rationale}`);
+          }
+        }
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
         results.push({
