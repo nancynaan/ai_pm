@@ -7,7 +7,7 @@ Design documents live **outside this repository**, in `../docs/`: BPMN models (`
 ## Layout
 
 - `apps/server`: Node.js 24 + TypeScript (Fastify, Drizzle/PostgreSQL).
-  - `src/harness` runs the pipeline: state machine (`states.ts`), orchestrator with per-run advisory locks, retries and usage-limit pauses, pg-boss stage jobs, event bus, and stage handlers (`stages/`, placeholders until Phases 3–7).
+  - `src/harness` runs the pipeline: state machine (`states.ts`), orchestrator with per-run advisory locks, retries and usage-limit pauses, pg-boss stage jobs, event bus, stage handlers (`stages/`; placeholders remain for documents, presentation and backlog until Phases 5–7), and pure calculators (`calculators/`).
   - `src/agents` runs agents: `runner.ts` (claude -p with a JSON schema, repair loop, limit detection), `registry.ts` (agents/_.agent.md and skills/_/SKILL.md).
   - `src/integrations` talks to Atlassian (REST), Claude (CLI) and SMTP.
   - `src/render` turns one Markdown source into Confluence storage format and Jira ADF.
@@ -46,6 +46,8 @@ npm run build              # shared → server → web
 npm run db:generate        # new Drizzle migration after editing apps/server/src/db/schema.ts
 npm run seed               # seed the demo project (dry-run; add -- --live to write, -- --sync-only to re-read)
 docker compose up --build  # full stack: http://localhost:3000, Mailpit http://localhost:8025
+docker compose exec app node apps/server/dist/evals/cli.js --only rewarded-menu-chest       # eval (in memory, saves nothing)
+docker compose exec app node apps/server/dist/evals/demo-cli.js --only rewarded-menu-chest  # saved demo run via the API
 ```
 
 ## Status
@@ -56,4 +58,7 @@ docker compose up --build  # full stack: http://localhost:3000, Mailpit http://l
 - Phase 3 (intake and analysis) is done: real agents for elicitation (question bank, at most 8 questions, one follow-up round for critical gaps), requirements analysis and impact analysis; draft Epic at intake; change-magnitude rule in `harness/magnitude.ts`; eval set in `evals/features.yaml` (`node apps/server/dist/evals/cli.js`).
 - Discovery questionnaire v2 (Phase 3 rework): 10 fixed questions in five areas (business justification, product context, scope, feasibility, decision readiness) plus up to 2 feature-specific questions and a comment; single/multi choice with limits, exclusive options and detail fields. After submission the Discovery Completeness Report (coverage, contradictions, gaps, findings by kind, confidence, decision readiness, next action) decides: complete / complete with assumptions → analysis; needs clarification → one clarification round; insufficient → the client continues with a preliminary assessment or stops (`awaiting_confirmation`). Evals v2 add client answer profiles and the expected discovery result per feature.
 - Eval status (questionnaire v1): 7/7 on change magnitude, at most 8 questions in round 1 and all four core questions asked. The first run was 3/7 (over-classification); the fixes were: low impacts never escalate, a calibration table in skills/impact-analysis, and "new save fields with defaults are Save System low; only a format change or data conversion is medium". One assessment takes about 4–5 minutes and 100–160k tokens. On a failure the eval prints the model's rationale for each medium/high rating.
-- Next is Phase 4: estimation, value and risk (story map, calculators, verdict).
+- Phase 4 (estimation, value, risk, verdict) is done: stage `estimating` runs the estimator, risk-analyst and value-analyst agents in parallel; `harness/assessment.ts` computes everything from their judgements with the calculators in `harness/calculators/` (PERT, seeded Monte Carlo forecast, sprint calendar, capacity and roadmap impact, labour budget + non-labour + EMV contingency, value scenarios with ROI/NPV/payback/break-even, WSJF, verdict rules). Settings in `config/feasibility-rules.yaml`. The assessment is stored as one typed document (`assessments` table, shared `assessmentSchema`) and shown on the **Analysis** tab (`#/analysis`, `#/analysis/<runId>`); the chat only gets an "Assessment ready" card. Defaults: start next sprint at 50 % capacity; budget limit = the client's limit or the remaining approved budget.
+- Phase 4 rules worth knowing: the forecast never runs faster than the busiest discipline (critical-resource constraint, so a "bottleneck" is planning information, not a condition); contingency = Σ risk EMV capped at 30 % of labour (overlapping risks double-count); a plain Go has no conditions (the team re-estimate is a standard next step shown on the Analysis tab); discovery confidence is "low" only for blocking issues, critical gaps or 4+ questions the client left open.
+- Evals by default: `--only rewarded-menu-chest,double-jump`, the demo pair (plain Go and No-Go). The others, including neon-menu-theme (cheap, but a menu theme does not pay back within a year), only on request.
+- Next is Phase 5: documents in Confluence.

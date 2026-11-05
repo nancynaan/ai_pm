@@ -17,8 +17,10 @@ import { createPgBossQueue } from './harness/queue.js';
 import { createRunRepository } from './harness/repository.js';
 import { createAgentAsker, createEpicDrafter, type StageServices } from './harness/services.js';
 import { analyzingStage } from './harness/stages/analyzing.js';
+import { loadAssessmentConfig } from './harness/assessment-config.js';
 import { loadDiscoveryConfig } from './harness/discovery-config.js';
 import { elicitingStage } from './harness/stages/eliciting.js';
+import { estimatingStage } from './harness/stages/estimating.js';
 import { intakeStage } from './harness/stages/intake.js';
 import { placeholderStages } from './harness/stages/placeholder.js';
 import { buildProbes } from './health/checks.js';
@@ -55,6 +57,7 @@ async function main() {
   });
 
   const repo = createRunRepository(db);
+  const analysis = createAnalysisRepository(db);
   const bus = createEventBus(repo);
   // Created after the database is ready; routes only receive requests after listen().
   const pipeline: { orchestrator?: ReturnType<typeof createOrchestrator> } = {};
@@ -70,6 +73,7 @@ async function main() {
       },
       repo,
       bus,
+      assessments: analysis,
     },
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
   });
@@ -82,7 +86,6 @@ async function main() {
   const stageGateway =
     credentials &&
     createAtlassianGateway(credentials, { readOnly: config.atlassian.writeMode === 'dry-run' });
-  const analysis = createAnalysisRepository(db);
   const definitions = loadAgentDefinitions();
   app.log.info({ agents: [...definitions.keys()] }, 'agent definitions loaded');
   const services: StageServices = {
@@ -106,6 +109,7 @@ async function main() {
     }),
     // Validated at startup: a broken questionnaire config stops the app instead of a run.
     discovery: loadDiscoveryConfig(),
+    assessment: loadAssessmentConfig(),
   };
 
   const orchestrator = createOrchestrator({
@@ -122,6 +126,7 @@ async function main() {
       // eliciting = the discovery completeness check
       eliciting: elicitingStage(services),
       analyzing: analyzingStage(services),
+      estimating: estimatingStage(services),
     },
     log: app.log,
   });

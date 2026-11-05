@@ -238,6 +238,22 @@ export const constraints = pgTable('constraints', {
   text: text('text').notNull(),
 });
 
+/**
+ * The feature assessment of a run (stage 03): estimates, forecast, budget, risks, value and the
+ * verdict, as one document validated by the shared assessment schema. Re-assessment replaces it.
+ */
+export const assessments = pgTable('assessments', {
+  runId: uuid('run_id')
+    .primaryKey()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  /** go | go_with_conditions | no_go */
+  decision: text('decision').notNull(),
+  preliminary: boolean('preliminary').notNull(),
+  data: jsonb('data').$type<unknown>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const componentImpacts = pgTable('component_impacts', {
   id: uuid('id').primaryKey().defaultRandom(),
   runId: uuid('run_id')

@@ -94,14 +94,24 @@ export function placeholderStages({ delayMs, autoApprove }: PlaceholderOptions):
 
     presenting: async (ctx) => {
       await sleep(delayMs);
+      // Until the presentation stage (Phase 6) exists, show the assessment's verdict and figures.
+      const assessed = (await ctx.repo.latestStageOutput(ctx.run.id, 'estimating')) as {
+        verdict?: string;
+        highlights?: string[];
+      } | null;
       await ctx.emit({
         type: 'decision_requested',
-        verdict: 'Go (placeholder)',
-        highlights: [
-          'Business value and ROI arrive in Phase 4',
-          'Release forecast and budget arrive in Phase 4',
-          'Slides with charts arrive in Phase 6',
-        ],
+        verdict: assessed?.verdict ?? 'Go (placeholder)',
+        highlights: assessed?.highlights?.length
+          ? [
+              ...assessed.highlights,
+              'Full details are on the Analysis tab; slides with charts arrive in Phase 6',
+            ]
+          : [
+              'Business value and ROI arrive in Phase 4',
+              'Release forecast and budget arrive in Phase 4',
+              'Slides with charts arrive in Phase 6',
+            ],
       });
       if (autoApprove) {
         await say(ctx, 'Auto-approve is on, so I am going straight to the backlog.');

@@ -1,7 +1,9 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { type Assessment, assessmentSchema, type AssessmentSummary } from '@ai-pm/shared';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { ImpactAnalysis, RequirementsAnalysis } from '../agents/schemas.js';
 import type { Db } from '../db/client.js';
 import {
+  assessments,
   assumptions,
   componentImpacts,
   constraints,
@@ -160,7 +162,116 @@ export function createAnalysisRepository(db: Db) {
         .where(eq(requirements.runId, runId))
         .orderBy(asc(requirements.code));
     },
+
+    /** Everything the analysis stage stored, for the assessment. */
+    async analysisOf(runId: string): Promise<StoredAnalysis> {
+      const [reqs, conflicts, impacts, deps, [summary]] = await Promise.all([
+        db.select().from(requirements).where(eq(requirements.runId, runId)).orderBy(asc(requirements.code)),
+        db.select().from(requirementConflicts).where(eq(requirementConflicts.runId, runId)),
+        db.select().from(componentImpacts).where(eq(componentImpacts.runId, runId)),
+        db.select().from(dependencies).where(eq(dependencies.runId, runId)),
+        db.select().from(featureAnalyses).where(eq(featureAnalyses.runId, runId)),
+      ]);
+      return {
+        requirements: reqs.map((r) => ({
+          code: r.code,
+          type: r.type,
+          category: r.category,
+          title: r.title,
+          description: r.description,
+          moscow: r.moscow,
+          inMvp: r.inMvp,
+          source: r.source,
+        })),
+        conflicts: conflicts.map((c) => ({
+          requirementCode: c.requirementCode,
+          with: c.withRef,
+          kind: c.kind,
+          description: c.description,
+          blocking: c.blocking,
+        })),
+        impacts: impacts.map((i) => ({ component: i.component, level: i.level, rationale: i.rationale })),
+        dependencies: deps.map((d) => ({
+          type: d.type,
+          target: d.target,
+          description: d.description,
+          blocking: d.blocking,
+        })),
+        magnitude: summary?.magnitude ?? 'unknown',
+        magnitudeReason: summary?.magnitudeReason ?? '',
+        mvpSummary: summary?.mvpSummary ?? '',
+        spike: summary?.spike ?? { needed: false },
+        performanceRisks: summary?.performanceRisks ?? [],
+      };
+    },
+
+    async saveAssessment(assessment: Assessment) {
+      const row = {
+        decision: assessment.verdict.decision,
+        preliminary: assessment.preliminary,
+        data: assessment,
+        updatedAt: new Date(),
+      };
+      await db
+        .insert(assessments)
+        .values({ runId: assessment.runId, ...row })
+        .onConflictDoUpdate({ target: assessments.runId, set: row });
+    },
+
+    async assessmentOf(runId: string): Promise<Assessment | null> {
+      const [row] = await db.select().from(assessments).where(eq(assessments.runId, runId));
+      return row ? assessmentSchema.parse(row.data) : null;
+    },
+
+    async listAssessments(limit = 50): Promise<AssessmentSummary[]> {
+      const rows = await db.select().from(assessments).orderBy(desc(assessments.updatedAt)).limit(limit);
+      return rows.flatMap((row) => {
+        const parsed = assessmentSchema.safeParse(row.data);
+        if (!parsed.success) return [];
+        const a = parsed.data;
+        return [
+          {
+            runId: a.runId,
+            title: a.title,
+            updatedAt: row.updatedAt.toISOString(),
+            decision: a.verdict.decision,
+            label: a.verdict.label,
+            preliminary: a.preliminary,
+            p85Date: a.forecast.full.dates.p85,
+            p85BudgetUsd: a.budget.total.p85,
+            baseNpvUsd: a.value.scenarios.find((s) => s.name === 'base')?.npvUsd ?? 0,
+          },
+        ];
+      });
+    },
   };
+}
+
+export interface StoredAnalysis {
+  requirements: {
+    code: string;
+    type: string;
+    category: string;
+    title: string;
+    description: string;
+    moscow: string;
+    inMvp: boolean;
+    source: string;
+  }[];
+  conflicts: {
+    requirementCode: string | null;
+    with: string;
+    kind: string;
+    description: string;
+    blocking: boolean;
+  }[];
+  impacts: { component: string; level: string; rationale: string }[];
+  dependencies: { type: string; target: string; description: string; blocking: boolean }[];
+  magnitude: string;
+  magnitudeReason: string;
+  mvpSummary: string;
+  spike: { needed: boolean; question?: string; timeboxDays?: number };
+  performanceRisks: string[];
 }
 
 export type AnalysisRepository = ReturnType<typeof createAnalysisRepository>;

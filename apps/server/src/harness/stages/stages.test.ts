@@ -9,6 +9,7 @@ import type {
 import type { AnalysisRepository, AnalysisToSave } from '../analysis-repository.js';
 import { requirementCodes } from '../analysis-repository.js';
 import type { ContextBuilder } from '../context.js';
+import { loadAssessmentConfig } from '../assessment-config.js';
 import { loadDiscoveryConfig, toUiQuestion } from '../discovery-config.js';
 import { clarificationQuestion } from '../discovery.js';
 import { classifyChange } from '../magnitude.js';
@@ -264,6 +265,7 @@ function setup(
       note: 'I created a draft Epic in Jira: AIPM-40',
     }),
     discovery: config,
+    assessment: loadAssessmentConfig(),
     analysis: {
       replaceElicitationAssumptions: async (_id: string, a: { kind?: string }[]) =>
         void (saved.assumptions = a),

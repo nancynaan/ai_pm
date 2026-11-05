@@ -1,0 +1,71 @@
+# Settings and rules of the assessment stage (BPMN 03): estimation, forecast, budget, risk,
+# value and the verdict. Agents supply judgements (story points, risk ratings, KPI effects);
+# everything here is applied in code. All values are editable.
+
+forecast:
+  # Monte Carlo trials per forecast; the random seed comes from the run id, so a re-run of the
+  # same run gives the same numbers.
+  trials: 10000
+  # Percentiles reported for scope, sprints and dates.
+  percentiles: [50, 85, 95]
+  # Sprints at most; a trial that needs more counts as this many (shown as "more than").
+  maxSprints: 40
+
+risk:
+  # Probability scale 1–5 → likelihood used for the expected monetary value (EMV).
+  probability: { 1: 0.1, 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.9 }
+  # Score = probability × impact (1–25).
+  levels: { medium: 8, high: 15, critical: 20 }
+  # The contingency reserve is the sum of the risks' EMV, capped at this share of the labour cost
+  # (P50): risks overlap (several assume the same delay) and the P85 forecast already covers
+  # estimate uncertainty, so an uncapped sum double-counts. 10–30 % is the usual range.
+  contingencyCapShare: 0.3
+
+value:
+  horizonMonths: 12
+  # Months until a feature reaches its full effect after release (linear ramp).
+  rampMonths: 2
+  # DAU basis: the KPI baseline before the global launch, the Business Case target after it.
+  dauAfterLaunch: target
+  # How a KPI change turns into a revenue change. Revenue/month = DAU × ARPDAU × 30.4.
+  # dau: per +1 % DAU. Retention in percentage points; session minutes in minutes; the rest in %.
+  # Each entry: how much DAU and ARPDAU change (in %) per unit of the KPI change.
+  elasticities:
+    dau: { dauPct: 1, arpdauPct: 0 }
+    d1_retention: { dauPct: 1.0, arpdauPct: 0 } # per +1 point of D1
+    d7_retention: { dauPct: 2.5, arpdauPct: 0 } # per +1 point of D7
+    d30_retention: { dauPct: 4.0, arpdauPct: 0 } # per +1 point of D30
+    session_minutes: { dauPct: 0, arpdauPct: 4.0 } # per +1 minute (more ad views, more spend)
+    payer_conversion: { dauPct: 0, arpdauPct: 0.55 } # per +1 % relative payer conversion (IAP share)
+    rewarded_views_per_dau: { dauPct: 0, arpdauPct: 0.45 } # per +1 % relative rewarded views (ad share)
+    arpdau: { dauPct: 0, arpdauPct: 1 } # per +1 % ARPDAU
+  # Plausibility caps per KPI and scenario; larger effects are cut to the cap and flagged.
+  caps:
+    dau: 15 # %
+    d1_retention: 3 # points
+    d7_retention: 3 # points
+    d30_retention: 2 # points
+    session_minutes: 1.5 # minutes
+    payer_conversion: 20 # %
+    rewarded_views_per_dau: 25 # %
+    arpdau: 15 # %
+
+wsjf:
+  # Job size on the Fibonacci scale from the expected story points of the full scope.
+  jobSize:
+    - { maxPoints: 13, size: 1 }
+    - { maxPoints: 21, size: 2 }
+    - { maxPoints: 34, size: 3 }
+    - { maxPoints: 55, size: 5 }
+    - { maxPoints: 89, size: 8 }
+    - { maxPoints: 144, size: 13 }
+    - { maxPoints: 999999, size: 20 }
+
+verdict:
+  # No-Go when the P85 budget exceeds the limit by more than this factor.
+  budgetNoGoFactor: 1.25
+  # A Go needs the base-case ROI at least this high over the horizon.
+  minBaseRoi: 0
+  # The assessment is preliminary when discovery confidence is low, when the client accepted
+  # open issues, or when the analysis was preliminary.
+  preliminaryWhenConfidence: [low]

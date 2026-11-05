@@ -97,6 +97,7 @@ function harness(handlers: StageHandlers, options: { lockFree?: () => boolean } 
       questionnaires.find((q) => q.id === id)!.answers = answers;
     },
     saveDecision: async () => undefined,
+    latestStageOutput: async () => null,
   } as unknown as RunRepository;
 
   const bus = {

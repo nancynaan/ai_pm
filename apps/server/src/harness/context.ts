@@ -30,6 +30,16 @@ export function createContextBuilder(opts: {
       return Object.fromEntries(rows.map((r) => [r.type, `## ${r.title}\n\n${r.text}`]));
     },
 
+    /** Structured data behind baseline pages by type (team, KPIs, risks, roadmap, backlog …). */
+    async baselineData(projectId: string | null, types: string[]): Promise<Record<string, unknown>> {
+      if (!projectId) return {};
+      const rows = await db
+        .select({ type: baselineArtifacts.type, data: baselineArtifacts.data })
+        .from(baselineArtifacts)
+        .where(and(eq(baselineArtifacts.projectId, projectId), inArray(baselineArtifacts.type, types)));
+      return Object.fromEntries(rows.map((r) => [r.type, r.data]));
+    },
+
     /** Component names and change sensitivity from the Architecture Overview. */
     async components(projectId: string | null): Promise<{ name: string; sensitivity: Sensitivity }[]> {
       if (!projectId) return [];

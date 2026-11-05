@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { buildAgentSpec, loadAgentDefinitions, loadSkill } from './registry.js';
+import { AGENT_SCHEMAS } from './schemas.js';
 import { AgentCallFailed, type CallRecord, createAgentRunner, UsageLimitReached } from './runner.js';
 
 const spec = {
@@ -100,6 +101,25 @@ describe('agent runner', () => {
     await expect(
       runnerWith(envelope({ is_error: true, api_error_status: 401, result: '' })).runner.run(spec, 'x'),
     ).rejects.toThrow(/claude setup-token/);
+  });
+});
+
+describe('the real agents and skills', () => {
+  it('all load, and every agent has an output schema and existing skills', () => {
+    const definitions = loadAgentDefinitions();
+    expect([...definitions.keys()].sort()).toEqual([
+      'discovery-review',
+      'elicitation',
+      'estimator',
+      'impact-analyst',
+      'requirements-analyst',
+      'risk-analyst',
+      'value-analyst',
+    ]);
+    for (const definition of definitions.values()) {
+      const built = buildAgentSpec(definition, { defaultModel: 'claude-opus-5-5', schemas: AGENT_SCHEMAS });
+      expect(built.systemPrompt.length).toBeGreaterThan(200);
+    }
   });
 });
 

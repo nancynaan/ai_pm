@@ -146,6 +146,32 @@ function EventItem({
           )}
         </>
       );
+    case 'assessment_ready':
+      return (
+        <div className="card assessment-ready">
+          <div className="card-head">
+            <h3>Assessment ready</h3>
+            <span
+              className={`tag ${event.decision === 'go' ? 'ok' : event.decision === 'no_go' ? 'err' : 'warn'}`}
+            >
+              <span aria-hidden="true">
+                {event.decision === 'go' ? '✓' : event.decision === 'no_go' ? '✕' : '!'}
+              </span>{' '}
+              {event.label}
+            </span>
+          </div>
+          <ul>
+            {event.highlights.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+          <p className="actions">
+            <a className="button primary" href={`#/analysis/${run.id}`}>
+              Open on the Analysis tab
+            </a>
+          </p>
+        </div>
+      );
     case 'decision_requested':
       return (
         <DecisionCard

@@ -1,50 +1,34 @@
-// Eval set v2: runs each sample feature through the real intake, discovery and analysis stages
+// Eval set v2: runs each sample feature through the real intake, discovery, analysis and assessment stages
 // (real Claude calls, real baseline and Jira backlog, no Jira writes) and checks the outcome.
 //
 //   docker compose exec app node apps/server/dist/evals/cli.js [--only ghost-race,cloud-save]
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import {
-  discoveryResultSchema,
-  NOT_SURE,
-  type Questionnaire,
-  type RunEvent,
-  type RunState,
-} from '@ai-pm/shared';
-import { parse } from 'yaml';
-import { z } from 'zod';
+import { type Assessment, NOT_SURE, type Questionnaire, type RunEvent, type RunState } from '@ai-pm/shared';
 import { loadAgentDefinitions } from '../agents/registry.js';
 import { createAgentRunner, type CallRecord } from '../agents/runner.js';
 import { AGENT_SCHEMAS } from '../agents/schemas.js';
 import { atlassianCredentials, loadConfig } from '../config.js';
 import { createDb } from '../db/client.js';
 import { projects } from '../db/schema.js';
-import type { AnalysisRepository, AnalysisToSave } from '../harness/analysis-repository.js';
+import {
+  type AnalysisRepository,
+  type AnalysisToSave,
+  requirementCodes,
+  type StoredAnalysis,
+} from '../harness/analysis-repository.js';
 import { createContextBuilder } from '../harness/context.js';
+import { loadAssessmentConfig } from '../harness/assessment-config.js';
 import { loadDiscoveryConfig } from '../harness/discovery-config.js';
 import type { StageContext, StageHandler } from '../harness/orchestrator.js';
 import type { RunRecord, RunRepository } from '../harness/repository.js';
 import { createAgentAsker, type StageServices } from '../harness/services.js';
 import { analyzingStage } from '../harness/stages/analyzing.js';
+import { estimatingStage } from '../harness/stages/estimating.js';
 import { elicitingStage } from '../harness/stages/eliciting.js';
 import { intakeStage } from '../harness/stages/intake.js';
 import { createAtlassianGateway } from '../integrations/atlassian/index.js';
 import { createClaudeCli } from '../integrations/claude-cli.js';
-
-const FEATURES_FILE = fileURLToPath(new URL('../../../../evals/features.yaml', import.meta.url));
-const featuresSchema = z.object({
-  features: z.array(
-    z.object({
-      id: z.string(),
-      expected: z.enum(['cosmetic', 'feature_extension', 'core_engine']),
-      discovery: z.array(discoveryResultSchema).min(1),
-      description: z.string(),
-      answers: z.record(z.string(), z.array(z.string()).min(1)),
-      details: z.record(z.string(), z.string()).optional(),
-    }),
-  ),
-});
+import { loadEvalFeatures, onlyArg } from './features.js';
 
 interface Result {
   id: string;
@@ -53,6 +37,9 @@ interface Result {
   discovery: string[];
   discoveryOk: boolean;
   confidence: string;
+  verdict: string;
+  assessmentOk: boolean;
+  costP85: number;
   questions: number[];
   requirements: number;
   calls: number;
@@ -70,6 +57,7 @@ function memoryRun(calls: CallRecord[]) {
   })[] = [];
   const outputs = new Map<RunState, unknown>();
   let analysis: AnalysisToSave | undefined;
+  let assessment: Assessment | undefined;
   let assumptions: string[] = [];
   let discoveryDecision: { decision: string; comment: string | null } | null = null;
   const repo = {
@@ -100,6 +88,32 @@ function memoryRun(calls: CallRecord[]) {
       analysis = a;
       return new Map();
     },
+    analysisOf: async (): Promise<StoredAnalysis> => {
+      const a = analysis!;
+      const codes = requirementCodes(a.analysis.requirements);
+      return {
+        requirements: a.analysis.requirements.map((r) => ({ ...r, code: codes.get(r.ref)! })),
+        conflicts: a.analysis.conflicts.map((c) => ({
+          requirementCode: c.requirementRef ? (codes.get(c.requirementRef) ?? null) : null,
+          with: c.with,
+          kind: c.kind,
+          description: c.description,
+          blocking: c.blocking,
+        })),
+        impacts: a.impact.componentImpacts,
+        dependencies: a.impact.dependencies,
+        magnitude: a.magnitude,
+        magnitudeReason: a.magnitudeReason,
+        mvpSummary: a.analysis.mvpSummary,
+        spike: {
+          needed: a.impact.spike.needed,
+          ...(a.impact.spike.question ? { question: a.impact.spike.question } : {}),
+          ...(a.impact.spike.timeboxDays ? { timeboxDays: a.impact.spike.timeboxDays } : {}),
+        },
+        performanceRisks: a.impact.performanceRisks,
+      };
+    },
+    saveAssessment: async (a: Assessment) => void (assessment = a),
   } as unknown as AnalysisRepository;
   /**
    * Answers open questions like the client in features.yaml: core questions from the profile,
@@ -125,18 +139,14 @@ function memoryRun(calls: CallRecord[]) {
     answerOpen,
     acceptPreliminary,
     analysis: () => analysis,
+    assessment: () => assessment,
   };
 }
 
 async function main() {
   const config = loadConfig();
-  // --only a,b  or  --only=a,b
-  const args = process.argv.slice(2);
-  const flag = args.indexOf('--only');
-  const only =
-    args.find((a) => a.startsWith('--only='))?.slice(7) ?? (flag >= 0 ? args[flag + 1] : undefined);
-  const wanted = only ? new Set(only.split(',')) : null;
-  const { features } = featuresSchema.parse(parse(readFileSync(FEATURES_FILE, 'utf8')));
+  const wanted = onlyArg(process.argv.slice(2));
+  const features = loadEvalFeatures();
 
   const { db, pool } = createDb(config.databaseUrl);
   const [project] = await db.select().from(projects).limit(1);
@@ -154,6 +164,7 @@ async function main() {
     defaultModel: config.claude.model,
   });
   const discovery = loadDiscoveryConfig();
+  const assessment = loadAssessmentConfig();
 
   const results: Result[] = [];
   try {
@@ -186,6 +197,7 @@ async function main() {
         analysis: memory.analysisRepo,
         context,
         discovery,
+        assessment,
       };
       const step = async (stage: RunState, handler: StageHandler) => {
         const outcome = await handler(ctx);
@@ -205,7 +217,10 @@ async function main() {
         }
         if (next === 'awaiting_confirmation') memory.acceptPreliminary();
         await step('analyzing', analyzingStage(services));
+        await step('estimating', estimatingStage(services));
         const saved = memory.analysis()!;
+        const assessed = memory.assessment()!;
+        const expectPreliminary = feature.assessment?.preliminary;
         const discoveryResults = reports().map((r) => r.result);
         const result: Result = {
           id: feature.id,
@@ -214,6 +229,12 @@ async function main() {
           discovery: discoveryResults,
           discoveryOk: feature.discovery.includes(discoveryResults[0]!),
           confidence: reports().at(-1)?.confidence ?? '-',
+          verdict: assessed.verdict.label,
+          assessmentOk:
+            (expectPreliminary === undefined || assessed.preliminary === expectPreliminary) &&
+            (!feature.assessment?.decision ||
+              feature.assessment.decision.includes(assessed.verdict.decision)),
+          costP85: assessed.budget.total.p85,
           questions: memory.questionnaires.map((q) => q.questions.length),
           requirements: saved.analysis.requirements.length,
           calls: calls.length,
@@ -224,6 +245,7 @@ async function main() {
         result.ok =
           result.magnitude === feature.expected &&
           result.discoveryOk &&
+          result.assessmentOk &&
           (result.questions[0] ?? 0) <= discovery.questions.length + discovery.maxFeatureQuestions &&
           result.questions.length <= discovery.maxRounds &&
           (result.questions[1] ?? 0) <= discovery.maxClarifications;
@@ -236,6 +258,11 @@ async function main() {
           .map((i) => `${i.component} ${i.level}`)
           .join(', ');
         console.log(`    impacts: ${impacts}`);
+        const base = assessed.value.scenarios.find((x) => x.name === 'base')!;
+        console.log(
+          `    assessment: ${assessed.verdict.label}; ${assessed.storyMap.totals.full.items} items, ${assessed.storyMap.totals.full.mean} points; MVP P85 ${assessed.forecast.mvp.dates.p85}, full P85 ${assessed.forecast.full.dates.p85}; cost P85 ${assessed.budget.total.p85.toLocaleString('en-US')}; base ROI ${Math.round(base.roi * 100)} %; ${assessed.risks.length} risks`,
+        );
+        for (const c of assessed.verdict.conditions) console.log(`    condition: ${c}`);
         for (const report of reports()) {
           const issues = [
             ...report.contradictions.map((c) => `${c.severity}${c.resolved ? ' (resolved)' : ''}: ${c.text}`),
@@ -260,6 +287,9 @@ async function main() {
           discovery: reports().map((r) => r.result),
           discoveryOk: false,
           confidence: '-',
+          verdict: '-',
+          assessmentOk: false,
+          costP85: 0,
           questions: memory.questionnaires.map((q) => q.questions.length),
           requirements: 0,
           calls: calls.length,
@@ -277,14 +307,21 @@ async function main() {
   }
 
   console.log(
-    '\n| Feature | Expected | Got | Discovery | Confidence | Questions | Reqs | Calls | Tokens | Time |',
+    '\n| Feature | Expected | Got | Discovery | Confidence | Verdict | Cost P85 | Questions | Reqs | Calls | Tokens | Time |',
   );
-  console.log('|---|---|---|---|---|---|---|---|---|---|');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const r of results) {
     const magnitudeOk = r.magnitude === r.expected;
     console.log(
-      `| ${r.id} | ${r.expected} | ${r.magnitude}${magnitudeOk ? '' : ' ✗'} | ${r.discovery.join(' → ') || '-'}${r.discoveryOk ? '' : ' ✗'} | ${r.confidence} | ${r.questions.join(' + ') || '-'} | ${r.requirements} | ${r.calls} | ${r.tokens.toLocaleString('en-US')} | ${r.seconds} s |`,
+      `| ${r.id} | ${r.expected} | ${r.magnitude}${magnitudeOk ? '' : ' ✗'} | ${r.discovery.join(' → ') || '-'}${r.discoveryOk ? '' : ' ✗'} | ${r.confidence} | ${r.verdict}${r.assessmentOk ? '' : ' ✗'} | ${Math.round(r.costP85).toLocaleString('en-US')} | ${r.questions.join(' + ') || '-'} | ${r.requirements} | ${r.calls} | ${r.tokens.toLocaleString('en-US')} | ${r.seconds} s |`,
     );
+  }
+  // Across features: a cosmetic change must cost less than a core-engine change.
+  const cosmetic = results.filter((r) => r.magnitude === 'cosmetic' && r.costP85 > 0);
+  const core = results.filter((r) => r.magnitude === 'core_engine' && r.costP85 > 0);
+  if (cosmetic.length && core.length) {
+    const ok = Math.max(...cosmetic.map((r) => r.costP85)) < Math.min(...core.map((r) => r.costP85));
+    console.log(`Cosmetic features cost less than core-engine features: ${ok ? 'yes' : 'NO ✗'}`);
   }
   const passed = results.filter((r) => r.ok).length;
   console.log(`\n${passed} of ${results.length} passed.`);

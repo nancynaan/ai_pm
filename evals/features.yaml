@@ -4,6 +4,8 @@
 #   expected   change magnitude after the analysis
 #   discovery  acceptable results of the first discovery check (the agent may add warnings, so
 #              "complete" features also accept "complete_with_assumptions")
+#   assessment optional expectations for the assessment (Phase 4): acceptable decisions and
+#              whether it must be preliminary, e.g. { decision: [go], preliminary: false }
 #   answers    the client's answers to the core questions; details are "question:option": text.
 #              Feature-specific and clarification questions get their first option.
 #
@@ -30,23 +32,60 @@ features:
       'priority:critical': Halloween update
       'constraints:fixed_deadline': 1 October
 
+  # A small cosmetic sold for gems. A fair assessment: it is cheap, but one menu theme does not
+  # earn back its cost within a year, so no verdict is expected.
   - id: neon-menu-theme
     expected: cosmetic
     discovery: [complete, complete_with_assumptions]
     description: >-
-      Players should be able to switch the menus and the HUD to a darker neon theme in the
-      settings, because many play at night.
+      Sell a premium Neon Night theme for the menus: a darker neon colour palette for the existing
+      menu screens, bought once in the store for gems and switched on in the settings. Our menu
+      colours already come from one shared colour stylesheet, so this is a palette swap with no
+      new artwork, and the in-run HUD stays as it is. Competing runners sell themes like this, and
+      our players keep asking for a darker look because many of them play at night.
     answers:
-      problem: [experience]
-      outcome: [satisfaction]
-      evidence: [reviews_social]
+      problem: [monetization]
+      outcome: [revenue, satisfaction]
+      evidence: [competitor, player_requests]
       audience: [active]
-      first_release_scope: [ui]
-      success: [feedback]
+      first_release_scope: [core, ui, economy]
+      success: [kpi_target, revenue]
       priority: [medium]
-      constraints: [flexible_timeline, limited_capacity]
-      dependencies: [none]
-      approval: [scope_only]
+      constraints: [flexible_budget, flexible_timeline]
+      dependencies: [modify_existing]
+      approval: [full]
+    details:
+      'success:kpi_target': 5 % of active players buy the theme within the first month
+
+  # Demo: a clean Go. A cheap new rewarded-ad placement on the existing ads integration, backed by
+  # data, with a flexible budget and timeline and full approval (the Risk Register itself proposes
+  # more rewarded placements, R-05).
+  - id: rewarded-menu-chest
+    expected: feature_extension
+    discovery: [complete, complete_with_assumptions]
+    assessment: { decision: [go], preliminary: false }
+    description: >-
+      Add a free gift chest to the main menu: once every four hours a player can watch a rewarded
+      ad to open it and get 50 coins, at most three times a day. It uses the rewarded ads we already
+      show for revives and double coins, and the chest icon and coin burst from the existing mission
+      rewards, so no new artwork is needed. A simple timer on the device is fine for the first
+      version: the rewards are small, so a few players changing their clock does not matter. We do
+      not sell ad removal. In a two-week soft-launch test with 10 % of players, a menu chest raised
+      rewarded ad views per DAU from 2.1 to 2.5 and did not lower coin-pack sales; most competing
+      runners have one.
+    answers:
+      problem: [monetization]
+      outcome: [revenue]
+      evidence: [analytics, competitor]
+      audience: [all]
+      first_release_scope: [core, ui, economy, analytics]
+      success: [revenue, kpi_target]
+      priority: [medium]
+      constraints: [flexible_budget, flexible_timeline]
+      dependencies: [modify_existing]
+      approval: [full]
+    details:
+      'success:kpi_target': Rewarded ad views per DAU from 2.1 to 2.4 within two months of release
 
   # Business intuition only, KPI target without numbers, dependencies left to the PM team.
   - id: daily-login-calendar
@@ -106,26 +145,30 @@ features:
       dependencies: [backend, modify_existing]
       approval: [exploring]
 
-  # Mostly unknown: no evidence, no scope, no success criteria, no constraints known.
+  # Demo: a clean No-Go. A core-engine change wanted as critical for a date two sprints away,
+  # with a fixed budget below the cost of two sprints of the feature team.
   - id: double-jump
     expected: core_engine
-    discovery: [complete_with_assumptions]
+    discovery: [complete, complete_with_assumptions, needs_clarification]
+    assessment: { decision: [no_go], preliminary: false }
     description: >-
       Let players buy a double-jump upgrade: after jumping they can jump once more in the air,
-      which opens new routes over tall obstacles.
+      which opens new routes over tall obstacles. It has to be in the Christmas update.
     answers:
       problem: [monetization]
       outcome: [revenue]
-      evidence: [no_evidence]
+      evidence: [player_requests]
       audience: [all]
-      first_release_scope: [undefined]
-      success: [undefined]
-      priority: [high]
-      constraints: [undetermined]
-      dependencies: [pm_identify]
-      approval: [requirements_only]
+      first_release_scope: [core, ui, economy]
+      success: [revenue]
+      priority: [critical]
+      constraints: [fixed_budget, fixed_deadline]
+      dependencies: [modify_existing]
+      approval: [full]
     details:
-      'approval:requirements_only': Head of product
+      'priority:critical': Christmas update
+      'constraints:fixed_deadline': 15 December 2026
+      'constraints:fixed_budget': $15,000
 
   - id: cloud-save
     expected: core_engine

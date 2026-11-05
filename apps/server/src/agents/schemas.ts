@@ -188,7 +188,150 @@ export const ImpactAnalysis = z.object({
 });
 export type ImpactAnalysis = z.infer<typeof ImpactAnalysis>;
 
+// ---- assessment (stage 03) -----------------------------------------------------------------
+
+const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 20, 40] as const;
+const points = z
+  .number()
+  .int()
+  .refine((n) => (FIBONACCI as readonly number[]).includes(n), 'Use the scale 0, 1, 2, 3, 5, 8, 13, 20, 40');
+
+export const EstimationResult = z.object({
+  items: z
+    .array(
+      z
+        .object({
+          ref: z
+            .string()
+            .regex(/^S-\d+$/)
+            .describe('S-1, S-2 …'),
+          activity: z.string().min(2).describe('Story-map backbone activity this item belongs to'),
+          title: z.string().min(3).max(120),
+          type: z.enum(['story', 'spike', 'enabler', 'nfr']),
+          release: z.enum(['mvp', 'later']),
+          discipline: z
+            .enum(['gameplay', 'backend', 'ui_art', 'qa', 'other'])
+            .describe(
+              'Who mainly does it: gameplay = all Unity client code incl. UI implementation; ui_art = design and art by the UI/UX & 2D artist only',
+            ),
+          requirementCodes: z.array(z.string()).describe('REQ-FR-### / REQ-NFR-### codes it implements'),
+          optimistic: points,
+          mostLikely: points,
+          pessimistic: points,
+          referenceStory: z
+            .string()
+            .nullable()
+            .describe('Key of the done reference story it was sized against'),
+          rationale: z.string().min(10),
+        })
+        .refine((i) => i.optimistic <= i.mostLikely && i.mostLikely <= i.pessimistic, {
+          message: 'optimistic ≤ mostLikely ≤ pessimistic',
+        }),
+    )
+    .min(2)
+    .max(40),
+  nonLabour: z
+    .array(
+      z.object({
+        description: z.string().min(3),
+        kind: z.enum(['one_off', 'monthly']),
+        amountUsd: z.number().nonnegative(),
+        basis: z.string().min(5).describe('Where the amount comes from'),
+      }),
+    )
+    .describe('Costs outside the team: outsourced assets, licences, server costs'),
+  deadline: z
+    .object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), basis: z.string().min(5) })
+    .nullable()
+    .describe('Only when asked: your reading of a deadline the client named without an explicit date'),
+  assumptions: z.array(z.string().min(5)),
+});
+export type EstimationResult = z.infer<typeof EstimationResult>;
+
+const scale = z.number().int().min(1).max(5);
+
+export const RiskAssessment = z.object({
+  risks: z
+    .array(
+      z.object({
+        title: z.string().min(3).max(100),
+        cause: z.string().min(5),
+        event: z.string().min(5),
+        effect: z.string().min(5),
+        category: z.enum(['Product', 'Technical', 'Schedule', 'Commercial', 'Compliance', 'Organizational']),
+        probability: scale,
+        impact: scale,
+        strategy: z.enum(['Avoid', 'Mitigate', 'Transfer', 'Accept']),
+        response: z.string().min(5),
+        owner: z.string().min(2).describe('A person from the Stakeholder Register'),
+        trigger: z.string().min(5).describe('The early-warning sign'),
+        costImpact: z.object({
+          extraPoints: z.number().int().nonnegative().describe('Extra story points if it happens'),
+          delaySprints: z.number().nonnegative().describe('Extra sprints if it happens'),
+          directCostUsd: z.number().nonnegative().describe('Other cost if it happens'),
+        }),
+        existingRiskId: z.string().nullable().describe('R-xx of the Risk Register entry it updates'),
+        source: z.enum(['analysis', 'discovery', 'dependency', 'assumption']),
+      }),
+    )
+    .min(1)
+    .max(15),
+});
+export type RiskAssessment = z.infer<typeof RiskAssessment>;
+
+const kpi = z.enum([
+  'dau',
+  'd1_retention',
+  'd7_retention',
+  'd30_retention',
+  'session_minutes',
+  'payer_conversion',
+  'rewarded_views_per_dau',
+  'arpdau',
+]);
+const scenario = z.object({
+  reach: z.number().min(0).max(1).describe('Share of players the feature reaches'),
+  kpiChanges: z
+    .array(
+      z.object({
+        kpi,
+        change: z
+          .number()
+          .describe(
+            'Retention in percentage points; session_minutes in minutes; everything else in % (relative)',
+          ),
+      }),
+    )
+    .max(4),
+  rationale: z.string().min(10),
+});
+const wsjfScale = z
+  .number()
+  .int()
+  .refine((n) => [1, 2, 3, 5, 8, 13, 20].includes(n), 'Use 1, 2, 3, 5, 8, 13 or 20');
+
+export const ValueAssessment = z.object({
+  primaryKpi: kpi,
+  drivers: z.string().min(20).describe('How the feature creates value, in two or three sentences'),
+  scenarios: z.object({ pessimistic: scenario, base: scenario, optimistic: scenario }),
+  wsjf: z.object({
+    businessValue: wsjfScale,
+    timeCriticality: wsjfScale,
+    riskReduction: wsjfScale,
+    rationale: z.string().min(10),
+  }),
+  validation: z
+    .string()
+    .min(10)
+    .describe('How to validate the value hypothesis cheaply before or during the build'),
+  assumptions: z.array(z.string().min(5)),
+});
+export type ValueAssessment = z.infer<typeof ValueAssessment>;
+
 export const AGENT_SCHEMAS: Record<string, z.ZodType> = {
+  EstimationResult,
+  RiskAssessment,
+  ValueAssessment,
   ElicitationResult,
   DiscoveryReview,
   RequirementsAnalysis,

@@ -7,6 +7,7 @@ import {
 } from '@ai-pm/shared';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import type { AnalysisRepository } from '../harness/analysis-repository.js';
 import type { EventBus } from '../harness/events.js';
 import { type Orchestrator, RunActionError } from '../harness/orchestrator.js';
 import type { RunRepository } from '../harness/repository.js';
@@ -15,6 +16,8 @@ export interface RunRouteDeps {
   orchestrator: Orchestrator;
   repo: RunRepository;
   bus: EventBus;
+  /** Feature assessments for the Analysis tab. */
+  assessments?: Pick<AnalysisRepository, 'assessmentOf' | 'listAssessments'>;
 }
 
 const idParams = z.object({ id: z.uuid() });
@@ -51,6 +54,17 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
       const run = await repo.getRun(id);
       if (!run) throw new RunActionError('Run not found', 404);
       return repo.summary(run);
+    }),
+  );
+
+  app.get('/api/assessments', async () => (deps.assessments ? deps.assessments.listAssessments() : []));
+
+  app.get('/api/runs/:id/assessment', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      const assessment = await deps.assessments?.assessmentOf(id);
+      if (!assessment) throw new RunActionError('This run has no assessment yet', 404);
+      return assessment;
     }),
   );
 

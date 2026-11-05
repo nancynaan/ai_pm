@@ -8,6 +8,7 @@ import { createPublisher, isPlaceholder } from '../sync/publisher.js';
 import type { SyncLogStore } from '../sync/sync-log.js';
 import type { AnalysisRepository } from './analysis-repository.js';
 import type { ContextBuilder } from './context.js';
+import type { AssessmentConfig } from './assessment-config.js';
 import type { DiscoveryConfig } from './discovery-config.js';
 import type { StageContext } from './orchestrator.js';
 import type { RunRecord } from './repository.js';
@@ -27,6 +28,8 @@ export interface StageServices {
   context: ContextBuilder;
   /** The discovery questionnaire and its completeness rules (config/discovery.yaml). */
   discovery: DiscoveryConfig;
+  /** Assessment settings and verdict rules (config/feasibility-rules.yaml). */
+  assessment: AssessmentConfig;
 }
 
 export function createAgentAsker(opts: {

@@ -219,6 +219,22 @@ describe('discovery completeness', () => {
     expect(assumptions).toContainEqual(expect.objectContaining({ kind: 'open_issue' }));
   });
 
+  it('keeps confidence at medium when only the review agent adds detail gaps', () => {
+    const detailGaps = ['Gem price', 'Contrast standard', 'Variant colours', 'Analytics source'].map(
+      (text) => ({
+        area: 'scope' as const,
+        text: `${text} is not defined.`,
+        critical: false,
+      }),
+    );
+    expect(report([round1()], { gaps: detailGaps }).report.confidence).toBe('medium');
+    // Four questions the client left open do lower it.
+    const unknown = { success: ['undefined'], constraints: ['undetermined'], dependencies: ['pm_identify'] };
+    expect(report([round1({ ...unknown, first_release_scope: ['undefined'] })]).report.confidence).toBe(
+      'low',
+    );
+  });
+
   it('notes warnings without blocking, and adds the readiness note when the client cannot approve', () => {
     const { report: r } = report([
       round1({

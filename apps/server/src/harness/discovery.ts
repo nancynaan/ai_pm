@@ -432,10 +432,12 @@ export function buildReport(input: {
     ...(evaluation.notSure ? [`${plural(evaluation.notSure, '"not sure" answer')}`] : []),
   ];
   const justification = coverage.find((c) => c.area === 'business_justification')?.status;
+  // Confidence reflects what the client left open. Detail questions the review agent adds lower it
+  // to medium at most; critical ones already count through `critical`.
   const confidence: DiscoveryReport['confidence'] =
     blocking.length ||
     critical.length ||
-    gaps.length >= 4 ||
+    evaluation.gaps.length >= 4 ||
     (evaluation.evidence === 'none' && justification !== 'covered')
       ? 'low'
       : drivers.length

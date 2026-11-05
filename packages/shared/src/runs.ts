@@ -191,6 +191,13 @@ export const runEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('questionnaire'), questionnaire: questionnaireSchema }),
   z.object({ type: z.literal('discovery_report'), report: discoveryReportSchema }),
+  /** The assessment is on the Analysis tab; the chat only links to it. */
+  z.object({
+    type: z.literal('assessment_ready'),
+    decision: z.enum(['go', 'go_with_conditions', 'no_go']),
+    label: z.string(),
+    highlights: z.array(z.string()),
+  }),
   z.object({
     type: z.literal('decision_requested'),
     verdict: z.string(),
