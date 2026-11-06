@@ -20,9 +20,14 @@ export interface DraftEpic {
   note: string;
 }
 
+export interface AskOptions<T> {
+  check?: (value: T) => string[];
+}
+
 /** What the real stages need; tests pass fakes. */
 export interface StageServices {
-  ask<T>(ctx: StageContext, agent: string, prompt: string): Promise<T>;
+  /** `check`: semantic checks; failures go back to the agent in the repair loop. */
+  ask<T>(ctx: StageContext, agent: string, prompt: string, options?: AskOptions<T>): Promise<T>;
   createDraftEpic(run: RunRecord, epicSummary: string, summary: string): Promise<DraftEpic>;
   analysis: AnalysisRepository;
   context: ContextBuilder;
@@ -38,7 +43,7 @@ export function createAgentAsker(opts: {
   schemas: Record<string, z.ZodType>;
   defaultModel: string;
 }): StageServices['ask'] {
-  return async <T>(ctx: StageContext, agent: string, prompt: string): Promise<T> => {
+  return async <T>(ctx: StageContext, agent: string, prompt: string, options?: AskOptions<T>): Promise<T> => {
     const definition = opts.definitions.get(agent);
     if (!definition) throw new Error(`Agent "${agent}" is not defined in agents/`);
     const spec = buildAgentSpec<T>(definition, {
@@ -48,6 +53,7 @@ export function createAgentAsker(opts: {
     });
     return opts.runner.run(spec, prompt, {
       onCall: (call) => ctx.repo.recordCall(ctx.run.id, ctx.executionId, call),
+      ...(options?.check ? { check: options.check } : {}),
     });
   };
 }

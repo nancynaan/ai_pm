@@ -1,5 +1,9 @@
 import {
   answersSchema,
+  DOCUMENT_LABEL,
+  DOCUMENT_TYPES,
+  type DocumentSet,
+  documentTypeSchema,
   createRunSchema,
   decisionSchema,
   discoveryConfirmationSchema,
@@ -8,6 +12,8 @@ import {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { AnalysisRepository } from '../pipeline-engine/analysis-repository.js';
+import { needsRoadmapProposal } from '../pipeline-engine/calculators/baseline.js';
+import type { DocumentRepository } from '../pipeline-engine/documents/repository.js';
 import type { EventBus } from '../pipeline-engine/events.js';
 import { type PipelineEngine, RunActionError } from '../pipeline-engine/engine.js';
 import type { RunRepository } from '../pipeline-engine/repository.js';
@@ -18,7 +24,11 @@ export interface RunRouteDeps {
   bus: EventBus;
   /** Feature assessments for the Analysis tab. */
   assessments?: Pick<AnalysisRepository, 'assessmentOf' | 'listAssessments'>;
+  /** The PM documents (stage 04) and the current Confluence write mode. */
+  documents?: { repo: Pick<DocumentRepository, 'setOf' | 'documentsOf'>; mode: 'dry-run' | 'live' };
 }
+
+const docParams = z.object({ id: z.uuid(), type: documentTypeSchema });
 
 const idParams = z.object({ id: z.uuid() });
 
@@ -65,6 +75,69 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
       const assessment = await deps.assessments?.assessmentOf(id);
       if (!assessment) throw new RunActionError('This run has no assessment yet', 404);
       return assessment;
+    }),
+  );
+
+  /** The Documents card: one row per document, with its Confluence link once published. */
+  app.get('/api/runs/:id/documents', async (request, reply) =>
+    handle(reply, async (): Promise<DocumentSet> => {
+      const { id } = idParams.parse(request.params);
+      const run = await repo.getRun(id);
+      if (!run) throw new RunActionError('Run not found', 404);
+      const [set, rows, assessment] = await Promise.all([
+        deps.documents?.repo.setOf(id) ?? null,
+        deps.documents?.repo.documentsOf(id) ?? [],
+        deps.assessments?.assessmentOf(id) ?? null,
+      ]);
+      const roadmapNeeded = assessment ? needsRoadmapProposal(assessment.roadmapImpact) : true;
+      return {
+        runId: id,
+        faNumber: set?.faNumber ?? null,
+        mode: deps.documents?.mode ?? 'dry-run',
+        publishedAt: set?.publishedAt?.toISOString() ?? null,
+        canPublish: run.state === 'awaiting_documents' || run.state === 'awaiting_decision',
+        running: run.state === 'documenting',
+        documents: DOCUMENT_TYPES.map((type) => {
+          const row = rows.find((r) => r.type === type);
+          if (row)
+            return {
+              type,
+              title: row.title,
+              status: row.status,
+              url: row.url,
+              version: row.confluenceVersion,
+              note: row.note,
+              preview: row.markdown.length > 0,
+            };
+          const notNeeded = type === 'roadmap_proposal' && !roadmapNeeded;
+          return {
+            type,
+            title: DOCUMENT_LABEL[type],
+            status: notNeeded ? 'not_needed' : 'pending',
+            url: null,
+            version: null,
+            note: notNeeded ? 'The feature does not change roadmap commitments' : null,
+            preview: false,
+          };
+        }),
+      };
+    }),
+  );
+
+  app.get('/api/runs/:id/documents/:type', async (request, reply) =>
+    handle(reply, async () => {
+      const { id, type } = docParams.parse(request.params);
+      const row = (await deps.documents?.repo.documentsOf(id))?.find((r) => r.type === type);
+      if (!row?.markdown) throw new RunActionError('This document has not been generated yet', 404);
+      return { type, title: row.title, markdown: row.markdown };
+    }),
+  );
+
+  app.post('/api/runs/:id/documents', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      await deps.pipelineEngine.publishDocuments(id);
+      return { ok: true };
     }),
   );
 

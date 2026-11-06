@@ -84,12 +84,8 @@ export function placeholderStages({ delayMs, autoApprove }: PlaceholderOptions):
       'Analysis (placeholder): from Phase 3, requirements are categorized and checked against the baseline here.',
     ),
     estimating: step(
-      'documenting',
+      'awaiting_documents',
       'Estimation (placeholder): from Phase 4, effort, release forecast, budget, value and risk are computed here.',
-    ),
-    documenting: step(
-      'presenting',
-      'Documents (placeholder): from Phase 5, the PM documents are published to Confluence here.',
     ),
 
     presenting: async (ctx) => {

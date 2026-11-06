@@ -2,7 +2,8 @@
 // a real, saved run (chat history, discovery report, analysis, assessment on the Analysis tab).
 // Answers come from the feature's profile in evals/features.yaml; feature-specific and
 // clarification questions get their first definite option; an incomplete discovery is accepted
-// as a preliminary assessment. The run stops at the client's decision gate.
+// as a preliminary assessment, and the documents are published with the button (dry-run unless
+// ATLASSIAN_WRITE_MODE=live). The run stops at the client's decision gate.
 //
 //   docker compose exec app node apps/server/dist/evals/demo-cli.js --only rewarded-menu-chest
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -69,6 +70,10 @@ async function demo(feature: EvalFeature): Promise<{ run: RunSummary; assessment
     } else if (run.state === 'awaiting_confirmation') {
       await call(`/api/runs/${runId}/discovery-decision`, z.object({ ok: z.boolean() }), { proceed: true });
       console.log('  accepted a preliminary assessment');
+    } else if (run.state === 'awaiting_documents') {
+      // The client presses "Generate and publish to Confluence" (dry-run unless the app is live).
+      await call(`/api/runs/${runId}/documents`, z.object({ ok: z.boolean() }), {});
+      console.log('  published the documents');
     } else if (STOP_STATES.has(run.state)) {
       const assessment = await call(`/api/runs/${runId}/assessment`, assessmentSchema).catch(() => null);
       return { run, assessment };

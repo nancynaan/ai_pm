@@ -290,3 +290,48 @@ export const featureAnalyses = pgTable('feature_analyses', {
   performanceRisks: jsonb('performance_risks').$type<string[]>().notNull().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * The PM documents of a run (stage 04): the FA number, the writer's draft (reused while the
+ * assessment is unchanged, so a re-publish makes no new Claude call) and when they were published.
+ */
+export const documentSets = pgTable('document_sets', {
+  runId: uuid('run_id')
+    .primaryKey()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  /** FA-<n> in Confluence titles; assigned once per run. */
+  faNumber: integer('fa_number').notNull().unique(),
+  /** Hash of the writer's inputs; a different hash means a new draft. */
+  inputHash: text('input_hash'),
+  draft: jsonb('draft').$type<unknown>(),
+  /** dry-run | live, of the last publish */
+  writeMode: text('write_mode'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  ...timestamps,
+});
+
+/** One row per document of a run, as last rendered and published. */
+export const documents = pgTable(
+  'documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+    /** DocumentType from @ai-pm/shared */
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    /** The rendered document (preview); empty when not needed. */
+    markdown: text('markdown').notNull(),
+    /** Figure key → the value printed in the document, checked against the DB on every publish. */
+    figures: jsonb('figures').$type<Record<string, string>>().notNull().default({}),
+    /** DocumentStatus from @ai-pm/shared */
+    status: text('status').notNull(),
+    confluencePageId: text('confluence_page_id'),
+    confluenceVersion: integer('confluence_version'),
+    url: text('url'),
+    note: text('note'),
+    ...timestamps,
+  },
+  (t) => [unique('documents_run_type').on(t.runId, t.type)],
+);

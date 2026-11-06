@@ -61,7 +61,7 @@ export function clientConstraints(answered: AnsweredQuestionnaire[]) {
   };
 }
 
-const requirementLines = (a: StoredAnalysis) =>
+export const requirementLines = (a: StoredAnalysis) =>
   a.requirements
     .map(
       (r) =>
@@ -69,7 +69,7 @@ const requirementLines = (a: StoredAnalysis) =>
     )
     .join('\n') || '(none)';
 
-function analysisSection(a: StoredAnalysis) {
+export function analysisSection(a: StoredAnalysis) {
   return [
     `Change magnitude: ${a.magnitude}. ${a.magnitudeReason}`,
     `MVP slice: ${a.mvpSummary}`,
@@ -239,7 +239,8 @@ export function estimatingStage(services: StageServices): StageHandler {
       highlights: points,
     });
     return {
-      next: 'documenting',
+      // The client publishes the documents with the button on the Documents card.
+      next: 'awaiting_documents',
       output: {
         decision: assessment.verdict.decision,
         verdict: assessment.verdict.label,

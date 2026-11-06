@@ -8,6 +8,8 @@ export const runStateSchema = z.enum([
   'awaiting_confirmation',
   'analyzing',
   'estimating',
+  /** The assessment is ready; the client decides when to publish the documents to Confluence. */
+  'awaiting_documents',
   'documenting',
   'presenting',
   'awaiting_decision',
@@ -197,6 +199,12 @@ export const runEventSchema = z.discriminatedUnion('type', [
     decision: z.enum(['go', 'go_with_conditions', 'no_go']),
     label: z.string(),
     highlights: z.array(z.string()),
+  }),
+  /** The documents were generated and published (or, in dry-run, checked); the card reloads them. */
+  z.object({
+    type: z.literal('documents'),
+    published: z.number().int(),
+    mode: z.enum(['dry-run', 'live']),
   }),
   z.object({
     type: z.literal('decision_requested'),

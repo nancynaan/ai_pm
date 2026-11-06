@@ -291,6 +291,23 @@ export function createRunRepository(db: Db) {
       return row?.output ?? null;
     },
 
+    /** When the stage last succeeded; null if it never did. */
+    async lastSucceededAt(runId: string, stage: RunState): Promise<Date | null> {
+      const [row] = await db
+        .select({ at: stageExecutions.finishedAt })
+        .from(stageExecutions)
+        .where(
+          and(
+            eq(stageExecutions.runId, runId),
+            eq(stageExecutions.stage, stage),
+            eq(stageExecutions.status, 'succeeded'),
+          ),
+        )
+        .orderBy(desc(stageExecutions.startedAt))
+        .limit(1);
+      return row?.at ?? null;
+    },
+
     /** Latest client decision at a gate: the assessment (default) or the discovery check. */
     async latestDecision(
       runId: string,

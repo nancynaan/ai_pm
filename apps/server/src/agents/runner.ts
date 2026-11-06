@@ -158,7 +158,11 @@ export function createAgentRunner({
     async run<T>(
       spec: AgentSpec<T>,
       prompt: string,
-      options: { onCall?: AgentRunnerOptions['record'] } = {},
+      options: {
+        onCall?: AgentRunnerOptions['record'];
+        /** Semantic checks beyond the schema (known ids, coverage); problems go into the repair prompt. */
+        check?: (value: T) => string[];
+      } = {},
     ): Promise<T> {
       const recordCall = options.onCall ?? record;
       const dir = await mkdtemp(join(tmpdir(), 'aipm-agent-'));
@@ -185,13 +189,18 @@ export function createAgentRunner({
           }
 
           let problem: string;
+          let semantic = false;
           try {
             const parsed = spec.schema.safeParse(parseAnswer(envelope));
-            if (parsed.success) {
+            const problems = parsed.success ? (options.check?.(parsed.data) ?? []) : [];
+            if (parsed.success && problems.length === 0) {
               await recordCall?.({ ...base, status: 'ok', error: null });
               return parsed.data;
             }
-            problem = z.prettifyError(parsed.error);
+            semantic = parsed.success;
+            problem = parsed.success
+              ? problems.map((p) => `- ${p}`).join('\n')
+              : z.prettifyError(parsed.error);
           } catch {
             problem = 'The answer was not valid JSON.';
           }
@@ -199,7 +208,9 @@ export function createAgentRunner({
           if (attempt >= maxRepairs) {
             throw new AgentCallFailed(`${spec.name} kept returning invalid output: ${problem.slice(0, 300)}`);
           }
-          currentPrompt = `${prompt}\n\nYour previous answer did not match the required JSON schema:\n${problem}\nReturn only JSON that matches the schema.`;
+          currentPrompt = semantic
+            ? `${prompt}\n\nYour previous answer had these problems:\n${problem}\nReturn the complete JSON again with them fixed.`
+            : `${prompt}\n\nYour previous answer did not match the required JSON schema:\n${problem}\nReturn only JSON that matches the schema.`;
         }
       } finally {
         await rm(dir, { recursive: true, force: true });

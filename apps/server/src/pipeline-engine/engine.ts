@@ -249,6 +249,27 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
       });
     },
 
+    /**
+     * The client's "Publish documents" button: after the assessment, or again from the decision
+     * step (a re-publish rewrites the same pages). The documents stage runs as a normal job.
+     */
+    async publishDocuments(runId: string) {
+      return act(runId, async (run) => {
+        if (run.state !== 'awaiting_documents' && run.state !== 'awaiting_decision')
+          throw new RunActionError(
+            `The run is ${run.state}; documents can be published once the assessment is ready and until the decision`,
+            409,
+          );
+        await bus.publish(run.id, {
+          type: 'message',
+          role: 'client',
+          text: 'Generate the documents and publish them to Confluence',
+        });
+        await repo.resetFailures(run.id, 'documenting');
+        await moveTo(run, 'documenting');
+      });
+    },
+
     async retry(runId: string) {
       return act(runId, async (run) => {
         if (run.state !== 'failed' || !run.failedState)

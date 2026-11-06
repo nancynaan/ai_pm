@@ -1,12 +1,21 @@
 // Eval set v2: runs each sample feature through the real intake, discovery, analysis and assessment stages
-// (real Claude calls, real baseline and Jira backlog, no Jira writes) and checks the outcome.
+// and the document writer (real Claude calls, real baseline and Jira backlog, no Jira or Confluence
+// writes) and checks the outcome, including the document validator.
 //
 //   docker compose exec app node apps/server/dist/evals/cli.js [--only ghost-race,cloud-save]
 import { randomUUID } from 'node:crypto';
 import { type Assessment, NOT_SURE, type Questionnaire, type RunEvent, type RunState } from '@ai-pm/shared';
 import { loadAgentDefinitions } from '../agents/registry.js';
 import { createAgentRunner, type CallRecord } from '../agents/runner.js';
-import { AGENT_SCHEMAS } from '../agents/schemas.js';
+import { AGENT_SCHEMAS, type DocumentDraft } from '../agents/schemas.js';
+import type { SeedData } from '../baseline/seed-data.js';
+import { needsRoadmapProposal } from '../pipeline-engine/calculators/baseline.js';
+import { buildFigures } from '../pipeline-engine/documents/figures.js';
+import type { DocumentInputs } from '../pipeline-engine/documents/inputs.js';
+import { writerPrompt } from '../pipeline-engine/documents/prompt.js';
+import { renderDocuments } from '../pipeline-engine/documents/render.js';
+import { loadTemplates } from '../pipeline-engine/documents/templates.js';
+import { checkDraft, checkRendered, draftCheckContext } from '../pipeline-engine/documents/validate.js';
 import { atlassianCredentials, loadConfig } from '../config.js';
 import { createDb } from '../db/client.js';
 import { projects } from '../db/schema.js';
@@ -40,6 +49,9 @@ interface Result {
   verdict: string;
   assessmentOk: boolean;
   costP85: number;
+  /** The documents' validator found nothing (writer draft and rendered result). */
+  documentsOk: boolean;
+  documentProblems: string[];
   questions: number[];
   requirements: number;
   calls: number;
@@ -140,6 +152,8 @@ function memoryRun(calls: CallRecord[]) {
     acceptPreliminary,
     analysis: () => analysis,
     assessment: () => assessment,
+    assumptions: () => assumptions,
+    discoveryDecision: () => discoveryDecision,
   };
 }
 
@@ -165,6 +179,12 @@ async function main() {
   });
   const discovery = loadDiscoveryConfig();
   const assessment = loadAssessmentConfig();
+  const templates = loadTemplates();
+  const baseline = await context.baselineData(project.id, ['project_charter', 'product_roadmap']);
+  const charter = baseline.project_charter as {
+    project: SeedData['project'];
+    financials: SeedData['kpis']['financials'];
+  };
 
   const results: Result[] = [];
   try {
@@ -220,6 +240,61 @@ async function main() {
         await step('estimating', estimatingStage(services));
         const saved = memory.analysis()!;
         const assessed = memory.assessment()!;
+
+        // Stage 04 without publishing: one writer call, then the validator on draft and result.
+        const intake = memory.outputs.get('intake') as {
+          elicitation?: { summary?: string; epicSummary?: string };
+        };
+        const inputs: DocumentInputs = {
+          run: { id: run.id, title: run.title, description: run.description },
+          faNumber: 0,
+          featureName: intake?.elicitation?.epicSummary ?? feature.id,
+          epicKey: null,
+          restatement: intake?.elicitation?.summary ?? null,
+          assessment: assessed,
+          analysis: await memory.analysisRepo.analysisOf(run.id),
+          report: reports().at(-1) ?? null,
+          answered: await memory.repo.answeredQuestionnaires(run.id),
+          assumptions: [
+            ...memory.assumptions().map((text) => ({
+              text,
+              kind: 'assumption',
+              source: 'elicitation',
+              owner: null,
+              status: 'open',
+            })),
+            ...saved.analysis.assumptions.map((a) => ({
+              text: a.text,
+              kind: 'assumption',
+              source: 'analysis',
+              owner: a.owner,
+              status: 'open',
+            })),
+          ],
+          constraints: saved.analysis.constraints,
+          decisions: memory.discoveryDecision()
+            ? [{ gate: 'discovery', decision: 'proceed', comment: null, decidedAt: new Date().toISOString() }]
+            : [],
+          baseline: {
+            projectName: charter.project.name,
+            financials: charter.financials,
+            roadmap: baseline.product_roadmap as SeedData['roadmap'],
+          },
+        };
+        const roadmapNeeded = needsRoadmapProposal(assessed.roadmapImpact);
+        const checks = draftCheckContext(inputs, roadmapNeeded);
+        const draft = await ask<DocumentDraft>(
+          ctx,
+          'pm-writer',
+          writerPrompt(inputs, buildFigures(inputs), templates, roadmapNeeded),
+          { check: (d) => checkDraft(d, checks) },
+        );
+        const documents = renderDocuments(inputs, draft, templates, {
+          brief: null,
+          riskRegister: null,
+          assumptionLog: null,
+        });
+        const documentProblems = [...checkDraft(draft, checks), ...checkRendered(documents, inputs)];
         const expectPreliminary = feature.assessment?.preliminary;
         const discoveryResults = reports().map((r) => r.result);
         const result: Result = {
@@ -235,6 +310,8 @@ async function main() {
             (!feature.assessment?.decision ||
               feature.assessment.decision.includes(assessed.verdict.decision)),
           costP85: assessed.budget.total.p85,
+          documentsOk: documentProblems.length === 0,
+          documentProblems,
           questions: memory.questionnaires.map((q) => q.questions.length),
           requirements: saved.analysis.requirements.length,
           calls: calls.length,
@@ -246,6 +323,7 @@ async function main() {
           result.magnitude === feature.expected &&
           result.discoveryOk &&
           result.assessmentOk &&
+          result.documentsOk &&
           (result.questions[0] ?? 0) <= discovery.questions.length + discovery.maxFeatureQuestions &&
           result.questions.length <= discovery.maxRounds &&
           (result.questions[1] ?? 0) <= discovery.maxClarifications;
@@ -263,6 +341,9 @@ async function main() {
           `    assessment: ${assessed.verdict.label}; ${assessed.storyMap.totals.full.items} items, ${assessed.storyMap.totals.full.mean} points; MVP P85 ${assessed.forecast.mvp.dates.p85}, full P85 ${assessed.forecast.full.dates.p85}; cost P85 ${assessed.budget.total.p85.toLocaleString('en-US')}; base ROI ${Math.round(base.roi * 100)} %; ${assessed.risks.length} risks`,
         );
         for (const c of assessed.verdict.conditions) console.log(`    condition: ${c}`);
+        console.log(
+          `    documents: ${documents.filter((d) => d.needed).length} rendered, ${draft.requirements.acceptanceCriteria.length} requirements with acceptance criteria, roadmap proposal ${roadmapNeeded ? 'yes' : 'no'}${documentProblems.length ? `; problems: ${documentProblems.join(' | ')}` : '; validator clean'}`,
+        );
         for (const report of reports()) {
           const issues = [
             ...report.contradictions.map((c) => `${c.severity}${c.resolved ? ' (resolved)' : ''}: ${c.text}`),
@@ -290,6 +371,8 @@ async function main() {
           verdict: '-',
           assessmentOk: false,
           costP85: 0,
+          documentsOk: false,
+          documentProblems: [],
           questions: memory.questionnaires.map((q) => q.questions.length),
           requirements: 0,
           calls: calls.length,
@@ -307,13 +390,13 @@ async function main() {
   }
 
   console.log(
-    '\n| Feature | Expected | Got | Discovery | Confidence | Verdict | Cost P85 | Questions | Reqs | Calls | Tokens | Time |',
+    '\n| Feature | Expected | Got | Discovery | Confidence | Verdict | Cost P85 | Docs | Questions | Reqs | Calls | Tokens | Time |',
   );
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const r of results) {
     const magnitudeOk = r.magnitude === r.expected;
     console.log(
-      `| ${r.id} | ${r.expected} | ${r.magnitude}${magnitudeOk ? '' : ' ✗'} | ${r.discovery.join(' → ') || '-'}${r.discoveryOk ? '' : ' ✗'} | ${r.confidence} | ${r.verdict}${r.assessmentOk ? '' : ' ✗'} | ${Math.round(r.costP85).toLocaleString('en-US')} | ${r.questions.join(' + ') || '-'} | ${r.requirements} | ${r.calls} | ${r.tokens.toLocaleString('en-US')} | ${r.seconds} s |`,
+      `| ${r.id} | ${r.expected} | ${r.magnitude}${magnitudeOk ? '' : ' ✗'} | ${r.discovery.join(' → ') || '-'}${r.discoveryOk ? '' : ' ✗'} | ${r.confidence} | ${r.verdict}${r.assessmentOk ? '' : ' ✗'} | ${Math.round(r.costP85).toLocaleString('en-US')} | ${r.documentsOk ? 'ok' : '✗'} | ${r.questions.join(' + ') || '-'} | ${r.requirements} | ${r.calls} | ${r.tokens.toLocaleString('en-US')} | ${r.seconds} s |`,
     );
   }
   // Across features: a cosmetic change must cost less than a core-engine change.

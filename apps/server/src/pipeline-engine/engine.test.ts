@@ -142,7 +142,11 @@ function setupEngine(handlers: StageHandlers, options: { lockFree?: () => boolea
 
 describe('pipeline engine', () => {
   it('walks a run from intake to completed with the placeholder stages', async () => {
-    const h = setupEngine(placeholderStages({ delayMs: 0, autoApprove: false }));
+    // The documents stage is real from Phase 5; a stub stands in for it here.
+    const h = setupEngine({
+      ...placeholderStages({ delayMs: 0, autoApprove: false }),
+      documenting: async () => ({ next: 'presenting' }),
+    });
     const run = await h.pipelineEngine.createRun('Ghost race against a friend\nmore details');
     expect(run.title).toBe('Ghost race against a friend');
 
@@ -163,6 +167,10 @@ describe('pipeline engine', () => {
       answers: { goal: ['retention'], deadline: ['flexible'], platforms: ['ios', 'android'] },
     });
     await h.drain();
+    // The run waits for the client's "publish documents" button.
+    expect(h.runs.get(run.id)!.state).toBe('awaiting_documents');
+    await h.pipelineEngine.publishDocuments(run.id);
+    await h.drain();
     expect(h.runs.get(run.id)!.state).toBe('awaiting_decision');
 
     await h.pipelineEngine.decide(run.id, { decision: 'approve' });
@@ -174,12 +182,27 @@ describe('pipeline engine', () => {
       'eliciting',
       'analyzing',
       'estimating',
+      'awaiting_documents',
       'documenting',
       'presenting',
       'awaiting_decision',
       'backlog',
       'completed',
     ]);
+  });
+
+  it('publishes documents only after the assessment and until the decision, and re-publishes from the decision', async () => {
+    const h = setupEngine({ documenting: async () => ({ next: 'awaiting_decision' }) });
+    const run = await h.pipelineEngine.createRun('A feature with documents');
+    await expect(h.pipelineEngine.publishDocuments(run.id)).rejects.toThrow(/documents can be published/);
+    h.runs.get(run.id)!.state = 'awaiting_decision';
+    await h.pipelineEngine.publishDocuments(run.id);
+    expect(h.runs.get(run.id)!.state).toBe('documenting');
+    await h.drain();
+    expect(h.runs.get(run.id)!.state).toBe('awaiting_decision');
+    expect(canTransition('estimating', 'documenting')).toBe(false); // only the client's button leads in
+    expect(canTransition('awaiting_documents', 'documenting')).toBe(true);
+    expect(canTransition('documenting', 'awaiting_decision')).toBe(true);
   });
 
   it('lets the client continue with a preliminary assessment, or stop, after an incomplete discovery', async () => {

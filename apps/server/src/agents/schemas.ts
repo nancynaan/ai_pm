@@ -328,7 +328,65 @@ export const ValueAssessment = z.object({
 });
 export type ValueAssessment = z.infer<typeof ValueAssessment>;
 
+// ---- pm-writer (BPMN 04) --------------------------------------------------------------------
+
+const prose = (what: string, max = 1500) =>
+  z
+    .string()
+    .min(40)
+    .max(max)
+    .describe(`${what}. Markdown paragraphs or "- " lists, no headings; numbers only as {{figure:key}}`);
+
+const reqCodes = z.array(z.string().regex(/^REQ-(FR|NFR)-\d{3}$/)).min(1);
+
+/** The writer's text for all documents of a feature, in one call; code renders tables and figures. */
+export const DocumentDraft = z.object({
+  brief: z.object({
+    problem: prose('The problem or opportunity, in the client’s terms and with its evidence'),
+    objectives: prose('What the feature should achieve and how success is judged'),
+    expectedValue: prose('The expected value: scenarios, payback and what the value rests on'),
+    scope: prose('Scope boundaries: what the first release includes, what comes later, what is out'),
+    impact: prose('Effect on the project baseline: budget, current release, launch target, components'),
+    recommendation: prose('The recommendation that follows from the verdict, and the decision needed'),
+  }),
+  requirements: z.object({
+    userFlows: z
+      .array(
+        z.object({
+          name: z.string().min(3).max(80),
+          steps: z.array(z.string().min(3).max(300)).min(2).max(12),
+          requirementCodes: reqCodes,
+        }),
+      )
+      .min(1)
+      .max(6)
+      .describe('The main user flows, step by step from the player’s view'),
+    businessRules: z
+      .array(z.object({ rule: z.string().min(10).max(400), requirementCodes: reqCodes }))
+      .max(20)
+      .describe('Rules the system enforces (limits, eligibility, timing, rewards)'),
+    acceptanceCriteria: z
+      .array(
+        z.object({
+          requirementCode: z.string().regex(/^REQ-(FR|NFR)-\d{3}$/),
+          criteria: z.array(z.string().min(10).max(400)).min(1).max(6),
+        }),
+      )
+      .min(1)
+      .describe('Testable criteria per requirement; every MVP requirement needs at least one'),
+  }),
+  estimation: z.object({
+    sequencing: prose('The order of the work: spike first, MVP before later scope, blocking dependencies'),
+    confidence: prose('How confident the forecast is, and the assumptions it rests on'),
+  }),
+  roadmap: prose('What the feature changes on the roadmap and what the Product Owner should decide')
+    .nullable()
+    .describe('Text for the roadmap proposal; null when the prompt says no proposal is needed'),
+});
+export type DocumentDraft = z.infer<typeof DocumentDraft>;
+
 export const AGENT_SCHEMAS: Record<string, z.ZodType> = {
+  DocumentDraft,
   EstimationResult,
   RiskAssessment,
   ValueAssessment,

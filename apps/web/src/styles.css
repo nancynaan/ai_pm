@@ -1080,3 +1080,61 @@ table.risks td {
     margin-bottom: 6px;
   }
 }
+
+/* ---- Documents (stage 04) ---- */
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.documents td.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.documents .tag {
+  white-space: nowrap;
+}
+
+.actions.start {
+  justify-content: flex-start;
+}
+
+.markdown {
+  overflow-wrap: anywhere;
+}
+
+.markdown h2 {
+  margin: 28px 0 8px;
+  font-size: 17px;
+}
+
+.markdown h3,
+.markdown h4 {
+  margin: 20px 0 6px;
+  font-size: 15px;
+}
+
+.markdown table {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.markdown blockquote {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.markdown blockquote p {
+  margin: 0;
+}
+
+.markdown pre {
+  overflow-x: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

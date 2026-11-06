@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { FastifyServerOptions } from 'fastify';
-import { loadAgentDefinitions } from './agents/registry.js';
+import { loadAgentDefinitions, loadSkill } from './agents/registry.js';
 import { createAgentRunner } from './agents/runner.js';
 import { AGENT_SCHEMAS } from './agents/schemas.js';
 import { buildApp } from './app.js';
@@ -10,6 +11,10 @@ import { type AppConfig, atlassianCredentials, ConfigError, loadConfig } from '.
 import { createDb } from './db/client.js';
 import { runMigrations, waitForDatabase } from './db/migrate.js';
 import { createAnalysisRepository } from './pipeline-engine/analysis-repository.js';
+import { createDocumentPublisher } from './pipeline-engine/documents/publish.js';
+import { createDocumentRepository } from './pipeline-engine/documents/repository.js';
+import { loadTemplates } from './pipeline-engine/documents/templates.js';
+import { documentingStage } from './pipeline-engine/stages/documenting.js';
 import { createContextBuilder } from './pipeline-engine/context.js';
 import { createEventBus } from './pipeline-engine/events.js';
 import { createPipelineEngine } from './pipeline-engine/engine.js';
@@ -58,6 +63,7 @@ async function main() {
 
   const repo = createRunRepository(db);
   const analysis = createAnalysisRepository(db);
+  const documentRepo = createDocumentRepository(db);
   const bus = createEventBus(repo);
   // Created after the database is ready; routes only receive requests after listen().
   const pipeline: { pipelineEngine?: ReturnType<typeof createPipelineEngine> } = {};
@@ -74,6 +80,7 @@ async function main() {
       repo,
       bus,
       assessments: analysis,
+      documents: { repo: documentRepo, mode: config.atlassian.writeMode },
     },
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
   });
@@ -112,6 +119,28 @@ async function main() {
     assessment: loadAssessmentConfig(),
   };
 
+  // Stage 04: the PM documents, published when the client presses the button.
+  const templates = loadTemplates();
+  const writer = definitions.get('pm-writer');
+  if (!writer) throw new Error('agents/pm-writer.agent.md is missing');
+  const documentServices = {
+    repo: documentRepo,
+    templates,
+    publisher: createDocumentPublisher({
+      gateway: stageGateway,
+      store: drizzleSyncLog(db),
+      mode: config.atlassian.writeMode,
+      siteUrl: config.atlassian.siteUrl,
+      jiraProjectKey: config.atlassian.jiraProjectKey,
+      spaceKey: config.atlassian.confluenceSpaceKey,
+    }),
+    writerVersion: createHash('sha256')
+      .update(JSON.stringify(writer))
+      .update(writer.skills.map((name) => loadSkill(name).body).join('\n'))
+      .update(JSON.stringify(templates))
+      .digest('hex'),
+  };
+
   const pipelineEngine = createPipelineEngine({
     repo,
     bus,
@@ -127,6 +156,7 @@ async function main() {
       eliciting: elicitingStage(services),
       analyzing: analyzingStage(services),
       estimating: estimatingStage(services),
+      documenting: documentingStage({ ...services, documents: documentServices }),
     },
     log: app.log,
   });

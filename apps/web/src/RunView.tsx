@@ -6,10 +6,11 @@ import {
   type StoredRunEvent,
   storedRunEventSchema,
 } from '@ai-pm/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { api, errorText } from './api.js';
 import { DiscoveryDecisionCard, DiscoveryReportCard, QuestionnaireCard } from './Discovery.js';
+import { DocumentsCard } from './Documents.js';
 import { STATE_LABEL } from './labels.js';
 import { RichText } from './RichText.js';
 
@@ -21,6 +22,7 @@ const POSITION: Record<RunState, number> = {
   awaiting_confirmation: 1,
   analyzing: 2,
   estimating: 3,
+  awaiting_documents: 4,
   documenting: 4,
   presenting: 5,
   awaiting_decision: 6,
@@ -42,7 +44,12 @@ function stepStatus(index: number, run: RunSummary): StepStatus {
   if (index < at) return 'done';
   if (index > at) return 'pending';
   if (state === 'declined') return 'skipped';
-  if (state === 'awaiting_answers' || state === 'awaiting_decision' || state === 'awaiting_confirmation')
+  if (
+    state === 'awaiting_answers' ||
+    state === 'awaiting_decision' ||
+    state === 'awaiting_confirmation' ||
+    state === 'awaiting_documents'
+  )
     return 'waiting';
   return 'active';
 }
@@ -51,6 +58,8 @@ export function RunView({ runId }: { runId: string }) {
   const [events, setEvents] = useState<StoredRunEvent[]>([]);
   const [run, setRun] = useState<RunSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped on state changes and document events, so the Documents card reloads.
+  const [docsVersion, setDocsVersion] = useState(0);
 
   const refresh = useCallback(() => {
     api(`/api/runs/${runId}`, runSummarySchema)
@@ -65,12 +74,15 @@ export function RunView({ runId }: { runId: string }) {
       const stored = storedRunEventSchema.parse(JSON.parse((message as MessageEvent<string>).data));
       setEvents((prev) => (prev.some((e) => e.id === stored.id) ? prev : [...prev, stored]));
       if (stored.event.type === 'state' || stored.event.type === 'questionnaire') refresh();
+      if (stored.event.type === 'state' || stored.event.type === 'documents') setDocsVersion((v) => v + 1);
     });
     return () => source.close();
   }, [runId, refresh]);
 
   // The discovery decision belongs to the latest report.
   const lastReportId = [...events].reverse().find((e) => e.event.type === 'discovery_report')?.id;
+  // The Documents card sits right below the latest assessment.
+  const lastAssessmentId = [...events].reverse().find((e) => e.event.type === 'assessment_ready')?.id;
 
   if (error) return <p className="error">Could not load the run: {error}</p>;
   if (!run) return <p className="muted">Loading…</p>;
@@ -94,7 +106,10 @@ export function RunView({ runId }: { runId: string }) {
 
       <section className="chat" aria-live="polite">
         {events.map((stored) => (
-          <EventItem key={stored.id} stored={stored} run={run} lastReportId={lastReportId} />
+          <Fragment key={stored.id}>
+            <EventItem stored={stored} run={run} lastReportId={lastReportId} />
+            {stored.id === lastAssessmentId && <DocumentsCard runId={run.id} version={docsVersion} />}
+          </Fragment>
         ))}
         {run.state === 'completed' && <p className="banner ok">This feature request is complete.</p>}
         {run.state === 'declined' && (
@@ -189,6 +204,7 @@ function EventItem({
         </p>
       ) : null;
     case 'state':
+    case 'documents':
       return null;
   }
 }

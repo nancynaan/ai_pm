@@ -65,6 +65,17 @@ describe('agent runner', () => {
     expect(calls.map((c) => c.status)).toEqual(['invalid_output', 'ok']);
   });
 
+  it('repairs answers that fail the semantic check', async () => {
+    const { runner, print, calls } = runnerWith(
+      envelope({ structured_output: { colour: 'blue', confidence: 3 } }),
+      envelope({ structured_output: { colour: 'red', confidence: 3 } }),
+    );
+    const check = (v: { colour: string }) => (v.colour === 'red' ? [] : ['The colour must be red.']);
+    await expect(runner.run(spec, 'Pick a colour', { check })).resolves.toMatchObject({ colour: 'red' });
+    expect((print.mock.calls[1] as [string[], string])[1]).toContain('- The colour must be red.');
+    expect(calls.map((c) => c.status)).toEqual(['invalid_output', 'ok']);
+  });
+
   it('gives up after the repair attempts', async () => {
     const bad = envelope({ result: 'not json' });
     const { runner } = runnerWith(bad, bad, bad);
@@ -112,6 +123,7 @@ describe('the real agents and skills', () => {
       'elicitation',
       'estimator',
       'impact-analyst',
+      'pm-writer',
       'requirements-analyst',
       'risk-analyst',
       'value-analyst',

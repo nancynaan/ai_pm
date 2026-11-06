@@ -227,6 +227,11 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
       return 'changed';
     },
 
+    /**
+     * Creates or updates a page, found by the sync log and then by title, so it is never created
+     * twice. By default an unchanged payload is skipped, which keeps edits made in Confluence;
+     * `overwrite` also rewrites a page someone edited since our last write.
+     */
     async upsertPage(input: {
       key: string;
       spaceId: string;
@@ -234,6 +239,7 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
       title: string;
       storage: string;
       labels: string[];
+      overwrite?: boolean;
     }): Promise<SyncResult & { version: number | null }> {
       const idempotencyKey = `confluence:page:${input.key}`;
       const parentId = isPlaceholder(input.parentId) ? undefined : input.parentId;
@@ -243,7 +249,12 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
       page ??= await gateway.confluence.findPageByTitle(input.spaceId, input.title);
 
       const base = { kind: 'page' as const, label: input.title };
-      if (page && entry?.externalId === page.id && entry.payloadHash === payloadHash) {
+      const editedSince =
+        input.overwrite &&
+        page &&
+        entry?.externalVersion != null &&
+        page.version.number !== entry.externalVersion;
+      if (page && entry?.externalId === page.id && entry.payloadHash === payloadHash && !editedSince) {
         return {
           ...record({ ...base, action: 'unchanged', externalId: page.id, url: pageUrl(page.id) }),
           version: page.version.number,
@@ -276,7 +287,99 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
         version: saved.version.number,
       };
     },
+
+    /**
+     * Writes our block on a shared page (Risk Register, Assumption Log) between two anchors: the
+     * block is replaced on a re-run, appended the first time, and the rest of the page is left
+     * exactly as it is. Written only when the page would change.
+     */
+    async upsertPageBlock(input: {
+      key: string;
+      pageId: string;
+      blockId: string;
+      storage: string;
+      label: string;
+    }): Promise<SyncResult & { version: number | null }> {
+      const base = { kind: 'page' as const, label: input.label };
+      const page = await gateway.confluence.getPage(input.pageId);
+      if (!page) {
+        return {
+          ...record({
+            ...base,
+            action: 'unchanged',
+            externalId: input.pageId,
+            note: 'shared page not found in Confluence',
+          }),
+          version: null,
+        };
+      }
+      const current = page.body?.storage?.value ?? '';
+      const next = spliceBlock(current, input.blockId, input.storage);
+      const url = pageUrl(page.id);
+      // Confluence normalises stored markup, so compare with what we wrote last: same block and
+      // nobody changed the page since our write → nothing to do.
+      const entry = await store.get(`confluence:block:${input.key}`);
+      const untouched =
+        entry?.payloadHash === hash(input.storage) && entry.externalVersion === page.version.number;
+      if (next === current || untouched) {
+        return {
+          ...record({ ...base, action: 'unchanged', externalId: page.id, url }),
+          version: page.version.number,
+        };
+      }
+      if (!live) {
+        return {
+          ...record({ ...base, action: 'would update', externalId: page.id, url }),
+          version: page.version.number,
+        };
+      }
+      const saved = await gateway.confluence.updatePage(page.id, page.version.number + 1, {
+        parentId: page.parentId ?? undefined,
+        title: page.title,
+        storage: next,
+      });
+      await store.save({
+        idempotencyKey: `confluence:block:${input.key}`,
+        system: 'confluence',
+        entityType: 'page_block',
+        externalId: saved.id,
+        externalVersion: saved.version.number,
+        payloadHash: hash(input.storage),
+        lastAction: 'updated',
+      });
+      return {
+        ...record({ ...base, action: 'updated', externalId: saved.id, url }),
+        version: saved.version.number,
+      };
+    },
   };
+}
+
+const blockAnchor = (blockId: string, edge: 'start' | 'end') =>
+  `<ac:structured-macro ac:name="anchor" ac:schema-version="1"><ac:parameter ac:name="">${blockId}-${edge}</ac:parameter></ac:structured-macro>`;
+
+/**
+ * Replaces the block between `<blockId>-start` and `<blockId>-end` anchors, or appends it.
+ * Confluence adds attributes (ac:macro-id) to macros it stores, so the anchors are matched
+ * by their name parameter, not by the exact markup we wrote.
+ */
+export function spliceBlock(page: string, blockId: string, block: string): string {
+  const id = blockId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const anchor = (edge: string) =>
+    `<ac:structured-macro\\b[^>]*ac:name="anchor"[^>]*>\\s*<ac:parameter ac:name="">${id}-${edge}</ac:parameter>\\s*</ac:structured-macro>`;
+  const wrapped = `${blockAnchor(blockId, 'start')}${block}${blockAnchor(blockId, 'end')}`;
+  // An anchor may sit inside a <p> after Confluence normalises the page; take the paragraph too.
+  const pattern = new RegExp(
+    `(?:<p>\\s*)?${anchor('start')}(?:\\s*</p>)?[\\s\\S]*?(?:<p>\\s*)?${anchor('end')}(?:\\s*</p>)?`,
+  );
+  if (pattern.test(page)) {
+    const existing = page.match(pattern)![0];
+    // Same content (ignoring Confluence's added attributes) → leave the page untouched.
+    const strip = (s: string) => s.replace(/\sac:macro-id="[^"]*"/g, '').replace(/<\/?p>/g, '');
+    if (strip(existing) === strip(wrapped)) return page;
+    return page.replace(pattern, () => wrapped);
+  }
+  return `${page}${wrapped}`;
 }
 
 export type Publisher = ReturnType<typeof createPublisher>;

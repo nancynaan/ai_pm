@@ -20,12 +20,36 @@ const CODE_LANGUAGES = new Set([
 /** A paragraph that contains only `{{children}}` becomes the Confluence "children" macro. */
 const CHILDREN_MACRO = '<ac:structured-macro ac:name="children" ac:schema-version="2" />';
 
-export function markdownToStorage(markdown: string): string {
-  return blocks(parseMarkdown(markdown)).replace(/<p>\{\{children\}\}<\/p>/g, CHILDREN_MACRO);
+/**
+ * `macros` replaces `{{macro:name}}` placeholders with storage XML: a paragraph holding only the
+ * placeholder becomes the macro (or disappears when the macro is empty); elsewhere it is inline.
+ */
+export function markdownToStorage(markdown: string, macros: Record<string, string> = {}): string {
+  return blocks(parseMarkdown(markdown))
+    .replace(/<p>\{\{children\}\}<\/p>/g, CHILDREN_MACRO)
+    .replace(/<p>\{\{macro:([a-z_]+)\}\}<\/p>/g, (all, name: string) => macros[name] ?? all)
+    .replace(/\{\{macro:([a-z_]+)\}\}/g, (all, name: string) => macros[name] ?? all);
 }
 
+export const childrenMacro = () => CHILDREN_MACRO;
+
 export function infoPanel(text: string): string {
-  return `<ac:structured-macro ac:name="info" ac:schema-version="1"><ac:rich-text-body><p>${escape(text)}</p></ac:rich-text-body></ac:structured-macro>`;
+  return panel('info', text);
+}
+
+/** Confluence panels: info (blue), note (yellow), warning (red). */
+export function panel(kind: 'info' | 'note' | 'warning', text: string): string {
+  return `<ac:structured-macro ac:name="${kind}" ac:schema-version="1"><ac:rich-text-body><p>${escape(text)}</p></ac:rich-text-body></ac:structured-macro>`;
+}
+
+/** The status lozenge, e.g. a green "Go". */
+export function statusMacro(colour: 'Green' | 'Yellow' | 'Red' | 'Blue' | 'Grey', title: string): string {
+  return `<ac:structured-macro ac:name="status" ac:schema-version="1"><ac:parameter ac:name="colour">${colour}</ac:parameter><ac:parameter ac:name="title">${escape(title)}</ac:parameter></ac:structured-macro>`;
+}
+
+/** An anchor; feature blocks on shared pages are marked with a start and an end anchor. */
+export function anchorMacro(name: string): string {
+  return `<ac:structured-macro ac:name="anchor" ac:schema-version="1"><ac:parameter ac:name="">${escape(name)}</ac:parameter></ac:structured-macro>`;
 }
 
 function blocks(tokens: Token[]): string {
