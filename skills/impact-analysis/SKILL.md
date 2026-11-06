@@ -12,7 +12,7 @@ Use exactly the component names from the Architecture Overview. Rate each compon
 - **medium:** new behaviour or a new interface in the component; existing behaviour stays.
 - **high:** existing behaviour changes, or the component needs new core capabilities (for example deterministic replay in movement, a new save format, a new networking model).
 
-The component's change sensitivity (core, feature, cosmetic) comes from the Architecture Overview. You rate only the level; the harness turns levels and sensitivities into the overall change magnitude.
+The component's change sensitivity (core, feature, cosmetic) comes from the Architecture Overview. You rate only the level; the pipeline engine turns levels and sensitivities into the overall change magnitude.
 
 ## Calibration examples
 

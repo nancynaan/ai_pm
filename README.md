@@ -51,6 +51,8 @@ It also emails the team before sprint events. Everything runs locally with Docke
 
 The JSON report is at <http://localhost:3000/api/health>. Emails sent by the app appear in Mailpit at <http://localhost:8025>.
 
+To explore the database, open pgAdmin at <http://localhost:5050>. It runs in desktop mode (no pgAdmin login, reachable only from this machine) and has the project database registered as **AI PM (local)**, connected with the user and password from `.env`. The pipeline's progress lives in `pipeline_runs` (current state), `stage_executions` (one row per stage attempt), `run_events` (the chat), `llm_calls`, `questionnaires` and `assessments`. Desktop clients such as DBeaver can connect to `127.0.0.1:5432` instead.
+
 After editing `.env`, recreate the app container so it picks up the new values:
 
 ```bash
@@ -129,14 +131,19 @@ npm run dev                             # API on :3000 (tsx watch), UI on :5173 
 ## Structure
 
 ```text
-apps/server       Node.js + TypeScript API, harness, integrations (Fastify, Drizzle, PostgreSQL)
+apps/server       Node.js + TypeScript API, pipeline engine, integrations (Fastify, Drizzle, PostgreSQL)
 apps/web          React + Vite UI
 packages/shared   zod schemas and types shared by server and web
 agents/           agent definitions (one Markdown file per role)
 skills/           knowledge packages used by the agents
-config/           YAML settings: sprint cadence, feasibility rules
+config/           YAML settings: discovery questionnaire, feasibility rules
 seed/baseline/    the demo project's baseline: data (YAML) and page texts (Markdown)
+evals/            sample feature requests with client answer profiles
+.claude/          Claude Code development harness: permissions, hooks (session status, format on edit,
+                  quality gate) and slash commands (/rebuild, /eval, /demo, /phase)
 ```
+
+The pipeline itself is in `apps/server/src/pipeline-engine`: `stages.ts` (states and transitions), `engine.ts` (the pipeline engine that runs the stage jobs), `stages/` (one handler per stage) and `calculators/` (estimates, forecast, budget, value, verdict).
 
 ## Configuration notes
 

@@ -15,17 +15,17 @@ import {
   type AnalysisToSave,
   requirementCodes,
   type StoredAnalysis,
-} from '../harness/analysis-repository.js';
-import { createContextBuilder } from '../harness/context.js';
-import { loadAssessmentConfig } from '../harness/assessment-config.js';
-import { loadDiscoveryConfig } from '../harness/discovery-config.js';
-import type { StageContext, StageHandler } from '../harness/orchestrator.js';
-import type { RunRecord, RunRepository } from '../harness/repository.js';
-import { createAgentAsker, type StageServices } from '../harness/services.js';
-import { analyzingStage } from '../harness/stages/analyzing.js';
-import { estimatingStage } from '../harness/stages/estimating.js';
-import { elicitingStage } from '../harness/stages/eliciting.js';
-import { intakeStage } from '../harness/stages/intake.js';
+} from '../pipeline-engine/analysis-repository.js';
+import { createContextBuilder } from '../pipeline-engine/context.js';
+import { loadAssessmentConfig } from '../pipeline-engine/assessment-config.js';
+import { loadDiscoveryConfig } from '../pipeline-engine/discovery-config.js';
+import type { StageContext, StageHandler } from '../pipeline-engine/engine.js';
+import type { RunRecord, RunRepository } from '../pipeline-engine/repository.js';
+import { createAgentAsker, type StageServices } from '../pipeline-engine/services.js';
+import { analyzingStage } from '../pipeline-engine/stages/analyzing.js';
+import { estimatingStage } from '../pipeline-engine/stages/estimating.js';
+import { elicitingStage } from '../pipeline-engine/stages/eliciting.js';
+import { intakeStage } from '../pipeline-engine/stages/intake.js';
 import { createAtlassianGateway } from '../integrations/atlassian/index.js';
 import { createClaudeCli } from '../integrations/claude-cli.js';
 import { loadEvalFeatures, onlyArg } from './features.js';

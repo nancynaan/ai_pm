@@ -10,7 +10,7 @@ import type { AnalysisRepository } from './analysis-repository.js';
 import type { ContextBuilder } from './context.js';
 import type { AssessmentConfig } from './assessment-config.js';
 import type { DiscoveryConfig } from './discovery-config.js';
-import type { StageContext } from './orchestrator.js';
+import type { StageContext } from './engine.js';
 import type { RunRecord } from './repository.js';
 
 export interface DraftEpic {

@@ -25,6 +25,36 @@ services:
       - '127.0.0.1:8025:8025' # inbox UI
       - '127.0.0.1:1025:1025' # SMTP, for running the server on the host
 
+  # Database browser at http://localhost:5050. Desktop mode (no pgAdmin login, local only); the
+  # project database is registered on start, with a pgpass file built from the values in .env.
+  pgadmin:
+    image: dpage/pgadmin4:9.8
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      PGADMIN_SERVER_JSON_FILE: /var/lib/pgadmin/servers.json
+      POSTGRES_USER: ${POSTGRES_USER:-aipm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-aipm}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        printf '%s\n' "postgres:5432:*:$${POSTGRES_USER}:$${POSTGRES_PASSWORD}" > /var/lib/pgadmin/pgpass
+        chmod 600 /var/lib/pgadmin/pgpass
+        printf '{"Servers":{"1":{"Name":"AI PM (local)","Group":"Servers","Host":"postgres","Port":5432,"MaintenanceDB":"%s","Username":"%s","SSLMode":"prefer","PassFile":"/var/lib/pgadmin/pgpass"}}}' "$${POSTGRES_DB}" "$${POSTGRES_USER}" > /var/lib/pgadmin/servers.json
+        exec /entrypoint.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:${PGADMIN_PORT:-5050}:80'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+
   app:
     build: .
     image: ai-pm-app
@@ -60,3 +90,4 @@ services:
 
 volumes:
   pgdata:
+  pgadmin:

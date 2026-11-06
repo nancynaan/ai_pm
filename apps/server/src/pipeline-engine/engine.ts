@@ -5,7 +5,7 @@ import { InvalidSubmission, validateSubmission } from './discovery.js';
 import type { EventBus } from './events.js';
 import type { StageQueue, StageJob } from './queue.js';
 import type { RunRecord, RunRepository } from './repository.js';
-import { ACTIVE_STATES, assertTransition, isActive, stateAfterDecision } from './states.js';
+import { ACTIVE_STATES, assertTransition, isActive, stateAfterDecision } from './stages.js';
 
 export interface StageContext {
   run: RunRecord;
@@ -35,7 +35,7 @@ export class RunActionError extends Error {
   }
 }
 
-export interface OrchestratorOptions {
+export interface PipelineEngineOptions {
   repo: RunRepository;
   bus: EventBus;
   queue: StageQueue;
@@ -59,7 +59,7 @@ const titleOf = (description: string) => {
  * handler, records the attempt, and moves the run on. Client actions (answers, decision, retry)
  * move runs out of waiting states. Every change is published as a run event.
  */
-export function createOrchestrator(opts: OrchestratorOptions) {
+export function createPipelineEngine(opts: PipelineEngineOptions) {
   const { repo, bus, queue, pool, handlers, log } = opts;
   const maxAttempts = opts.maxAttempts ?? 3;
   const retryDelaySeconds = opts.retryDelaySeconds ?? 10;
@@ -260,4 +260,4 @@ export function createOrchestrator(opts: OrchestratorOptions) {
   };
 }
 
-export type Orchestrator = ReturnType<typeof createOrchestrator>;
+export type PipelineEngine = ReturnType<typeof createPipelineEngine>;

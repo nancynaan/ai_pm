@@ -6,7 +6,7 @@ import { buildAssessment, type Deadline, type PlanningFacts } from '../assessmen
 import { parseDate, parseMoney } from '../calculators/calendar.js';
 import { seedFrom } from '../calculators/random.js';
 import { CLARIFY_PREFIX, evaluateAnswers, reportForPrompt } from '../discovery.js';
-import type { StageHandler } from '../orchestrator.js';
+import type { StageHandler } from '../engine.js';
 import type { StageServices } from '../services.js';
 import type { DiscoveryOutput } from './eliciting.js';
 import { clientRequest, section } from './prompts.js';
@@ -96,7 +96,7 @@ export function highlights(a: Assessment): string[] {
 
 /**
  * BPMN 03: estimate, forecast, budget, risks, value and verdict. The estimator, risk analyst and
- * value analyst run in parallel; the harness computes every number and saves the assessment for
+ * value analyst run in parallel; the pipeline engine computes every number and saves the assessment for
  * the Analysis tab.
  */
 export function estimatingStage(services: StageServices): StageHandler {

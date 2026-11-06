@@ -1,6 +1,6 @@
 import { NOT_SURE, type Question, type RunState } from '@ai-pm/shared';
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { StageContext, StageHandler, StageHandlers } from '../orchestrator.js';
+import type { StageContext, StageHandler, StageHandlers } from '../engine.js';
 
 /**
  * Walking skeleton: every stage exists and moves the run along, but does no real work yet. Phases

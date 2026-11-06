@@ -55,7 +55,7 @@ A contradiction is two statements that cannot both hold, or that make a recommen
 
 ## Result
 
-The harness decides the result from the findings:
+The pipeline engine decides the result from the findings:
 
 - `complete`: all areas answered, consistent, backed by evidence;
 - `complete_with_assumptions`: nothing blocking; open points are recorded as assumptions and results depending on them are marked preliminary;

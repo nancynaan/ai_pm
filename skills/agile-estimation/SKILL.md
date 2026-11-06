@@ -1,6 +1,6 @@
 ---
 name: agile-estimation
-description: "How to build a story map for a feature and size its items with three-point estimates in story points, relative to the team's reference stories, so the harness can forecast the release with Monte Carlo."
+description: "How to build a story map for a feature and size its items with three-point estimates in story points, relative to the team's reference stories, so the pipeline engine can forecast the release with Monte Carlo."
 ---
 
 ## Story map

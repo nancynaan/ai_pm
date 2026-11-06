@@ -9,20 +9,20 @@ import { readBaselineSummary } from './baseline/store.js';
 import { type AppConfig, atlassianCredentials, ConfigError, loadConfig } from './config.js';
 import { createDb } from './db/client.js';
 import { runMigrations, waitForDatabase } from './db/migrate.js';
-import { createAnalysisRepository } from './harness/analysis-repository.js';
-import { createContextBuilder } from './harness/context.js';
-import { createEventBus } from './harness/events.js';
-import { createOrchestrator } from './harness/orchestrator.js';
-import { createPgBossQueue } from './harness/queue.js';
-import { createRunRepository } from './harness/repository.js';
-import { createAgentAsker, createEpicDrafter, type StageServices } from './harness/services.js';
-import { analyzingStage } from './harness/stages/analyzing.js';
-import { loadAssessmentConfig } from './harness/assessment-config.js';
-import { loadDiscoveryConfig } from './harness/discovery-config.js';
-import { elicitingStage } from './harness/stages/eliciting.js';
-import { estimatingStage } from './harness/stages/estimating.js';
-import { intakeStage } from './harness/stages/intake.js';
-import { placeholderStages } from './harness/stages/placeholder.js';
+import { createAnalysisRepository } from './pipeline-engine/analysis-repository.js';
+import { createContextBuilder } from './pipeline-engine/context.js';
+import { createEventBus } from './pipeline-engine/events.js';
+import { createPipelineEngine } from './pipeline-engine/engine.js';
+import { createPgBossQueue } from './pipeline-engine/queue.js';
+import { createRunRepository } from './pipeline-engine/repository.js';
+import { createAgentAsker, createEpicDrafter, type StageServices } from './pipeline-engine/services.js';
+import { analyzingStage } from './pipeline-engine/stages/analyzing.js';
+import { loadAssessmentConfig } from './pipeline-engine/assessment-config.js';
+import { loadDiscoveryConfig } from './pipeline-engine/discovery-config.js';
+import { elicitingStage } from './pipeline-engine/stages/eliciting.js';
+import { estimatingStage } from './pipeline-engine/stages/estimating.js';
+import { intakeStage } from './pipeline-engine/stages/intake.js';
+import { placeholderStages } from './pipeline-engine/stages/placeholder.js';
 import { buildProbes } from './health/checks.js';
 import { createAtlassianGateway } from './integrations/atlassian/index.js';
 import { createClaudeCli } from './integrations/claude-cli.js';
@@ -60,16 +60,16 @@ async function main() {
   const analysis = createAnalysisRepository(db);
   const bus = createEventBus(repo);
   // Created after the database is ready; routes only receive requests after listen().
-  const pipeline: { orchestrator?: ReturnType<typeof createOrchestrator> } = {};
+  const pipeline: { pipelineEngine?: ReturnType<typeof createPipelineEngine> } = {};
   const app = await buildApp({
     logger: loggerOptions(config),
     probes,
     version: pkg.version,
     baseline: () => readBaselineSummary(db, config),
     runs: {
-      get orchestrator() {
-        if (!pipeline.orchestrator) throw new Error('The pipeline is still starting');
-        return pipeline.orchestrator;
+      get pipelineEngine() {
+        if (!pipeline.pipelineEngine) throw new Error('The pipeline is still starting');
+        return pipeline.pipelineEngine;
       },
       repo,
       bus,
@@ -112,7 +112,7 @@ async function main() {
     assessment: loadAssessmentConfig(),
   };
 
-  const orchestrator = createOrchestrator({
+  const pipelineEngine = createPipelineEngine({
     repo,
     bus,
     queue: createPgBossQueue(config.databaseUrl, (err) => app.log.error({ err }, 'job queue error')),
@@ -130,13 +130,13 @@ async function main() {
     },
     log: app.log,
   });
-  pipeline.orchestrator = orchestrator;
-  await orchestrator.start();
+  pipeline.pipelineEngine = pipelineEngine;
+  await pipelineEngine.start();
 
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');
     await app.close();
-    await orchestrator.stop();
+    await pipelineEngine.stop();
     await pool.end();
     process.exit(0);
   };

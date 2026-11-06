@@ -2,7 +2,7 @@
   "name": "@ai-pm/server",
   "version": "0.1.0",
   "private": true,
-  "description": "AI PM pipeline server: harness, agents, Atlassian integration, scheduler and API.",
+  "description": "AI PM pipeline server: pipeline engine, agents, Atlassian integration, scheduler and API.",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

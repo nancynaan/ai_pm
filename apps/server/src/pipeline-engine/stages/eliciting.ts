@@ -1,7 +1,7 @@
 import type { DiscoveryReport } from '@ai-pm/shared';
 import type { DiscoveryReview, ElicitationResult } from '../../agents/schemas.js';
 import { buildReport, evaluateAnswers, evaluationForPrompt } from '../discovery.js';
-import type { StageHandler } from '../orchestrator.js';
+import type { StageHandler } from '../engine.js';
 import type { StageServices } from '../services.js';
 import { clientRequest, section, transcript } from './prompts.js';
 

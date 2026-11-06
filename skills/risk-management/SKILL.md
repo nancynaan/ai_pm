@@ -17,7 +17,7 @@ description: 'How to identify and rate project risks for a game feature: cause-e
 | 4     | Likely: 50–70 %                     | Major: a missed release date, more than 25 % over budget, or store or review damage |
 | 5     | Almost certain: above 70 %          | Severe: the feature fails its purpose, a launch slips, data loss, a store ban       |
 
-The harness scores P × I (high ≥ 15, critical ≥ 20) and prices the risk with your cost impact.
+The pipeline engine scores P × I (high ≥ 15, critical ≥ 20) and prices the risk with your cost impact.
 
 ## Strategies
 
@@ -41,7 +41,7 @@ The harness scores P × I (high ≥ 15, critical ≥ 20) and prices the risk wit
 
 ## Cost impact
 
-Give what it costs **if it happens**: extra story points of rework, extra sprints of delay (the whole feature team waiting or redoing), and direct cost (refunds, external fixes, lost spend). Use 0 where a part does not apply. The harness turns this into money and the expected value (EMV), which forms the contingency.
+Give what it costs **if it happens**: extra story points of rework, extra sprints of delay (the whole feature team waiting or redoing), and direct cost (refunds, external fixes, lost spend). Use 0 where a part does not apply. The pipeline engine turns this into money and the expected value (EMV), which forms the contingency.
 
 ## Existing Register
 

@@ -3,11 +3,11 @@ import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { UsageLimitReached } from '../agents/runner.js';
 import type { EventBus } from './events.js';
-import { createOrchestrator, RunActionError, type StageHandlers } from './orchestrator.js';
+import { createPipelineEngine, RunActionError, type StageHandlers } from './engine.js';
 import type { StageJob, StageQueue } from './queue.js';
 import type { RunRecord, RunRepository } from './repository.js';
 import { placeholderStages } from './stages/placeholder.js';
-import { canTransition, stateAfterDecision } from './states.js';
+import { canTransition, stateAfterDecision } from './stages.js';
 
 describe('state machine', () => {
   it('allows the BPMN path and rejects shortcuts', () => {
@@ -30,7 +30,7 @@ describe('state machine', () => {
 });
 
 /** In-memory stand-ins for Postgres, the advisory lock and pg-boss. */
-function harness(handlers: StageHandlers, options: { lockFree?: () => boolean } = {}) {
+function setupEngine(handlers: StageHandlers, options: { lockFree?: () => boolean } = {}) {
   const runs = new Map<string, RunRecord>();
   const executions: { runId: string; stage: RunState; status: string }[] = [];
   const questionnaires: (Questionnaire & { runId: string; answers?: Record<string, string[]> })[] = [];
@@ -124,18 +124,26 @@ function harness(handlers: StageHandlers, options: { lockFree?: () => boolean } 
   const pool = { connect: async () => client } as unknown as pg.Pool;
   const log = { info: () => undefined, error: () => undefined };
 
-  const orchestrator = createOrchestrator({ repo, bus, queue, pool, handlers, log, retryDelaySeconds: 5 });
+  const pipelineEngine = createPipelineEngine({
+    repo,
+    bus,
+    queue,
+    pool,
+    handlers,
+    log,
+    retryDelaySeconds: 5,
+  });
   /** Runs queued jobs like the worker would, until none are left. */
   async function drain() {
-    for (let job = jobs.shift(); job; job = jobs.shift()) await orchestrator.executeStage(job.job);
+    for (let job = jobs.shift(); job; job = jobs.shift()) await pipelineEngine.executeStage(job.job);
   }
-  return { orchestrator, runs, events, jobs, executions, drain };
+  return { pipelineEngine, runs, events, jobs, executions, drain };
 }
 
-describe('orchestrator', () => {
+describe('pipeline engine', () => {
   it('walks a run from intake to completed with the placeholder stages', async () => {
-    const h = harness(placeholderStages({ delayMs: 0, autoApprove: false }));
-    const run = await h.orchestrator.createRun('Ghost race against a friend\nmore details');
+    const h = setupEngine(placeholderStages({ delayMs: 0, autoApprove: false }));
+    const run = await h.pipelineEngine.createRun('Ghost race against a friend\nmore details');
     expect(run.title).toBe('Ghost race against a friend');
 
     await h.drain();
@@ -145,19 +153,19 @@ describe('orchestrator', () => {
     ).questionnaire;
 
     await expect(
-      h.orchestrator.submitAnswers(run.id, {
+      h.pipelineEngine.submitAnswers(run.id, {
         questionnaireId: questionnaire.id,
         answers: { goal: ['retention'] },
       }),
     ).rejects.toThrow(RunActionError);
-    await h.orchestrator.submitAnswers(run.id, {
+    await h.pipelineEngine.submitAnswers(run.id, {
       questionnaireId: questionnaire.id,
       answers: { goal: ['retention'], deadline: ['flexible'], platforms: ['ios', 'android'] },
     });
     await h.drain();
     expect(h.runs.get(run.id)!.state).toBe('awaiting_decision');
 
-    await h.orchestrator.decide(run.id, { decision: 'approve' });
+    await h.pipelineEngine.decide(run.id, { decision: 'approve' });
     await h.drain();
     expect(h.runs.get(run.id)!.state).toBe('completed');
     expect(h.events.filter((e) => e.type === 'state').map((e) => (e as { state: string }).state)).toEqual([
@@ -175,15 +183,15 @@ describe('orchestrator', () => {
   });
 
   it('lets the client continue with a preliminary assessment, or stop, after an incomplete discovery', async () => {
-    const h = harness({});
-    const go = await h.orchestrator.createRun('A feature with open points');
-    const stop = await h.orchestrator.createRun('Another feature with open points');
-    await expect(h.orchestrator.confirmDiscovery(go.id, { proceed: true })).rejects.toThrow(/not waiting/);
+    const h = setupEngine({});
+    const go = await h.pipelineEngine.createRun('A feature with open points');
+    const stop = await h.pipelineEngine.createRun('Another feature with open points');
+    await expect(h.pipelineEngine.confirmDiscovery(go.id, { proceed: true })).rejects.toThrow(/not waiting/);
     h.runs.get(go.id)!.state = 'awaiting_confirmation';
     h.runs.get(stop.id)!.state = 'awaiting_confirmation';
 
-    await h.orchestrator.confirmDiscovery(go.id, { proceed: true, comment: 'Budget owner agrees' });
-    await h.orchestrator.confirmDiscovery(stop.id, { proceed: false });
+    await h.pipelineEngine.confirmDiscovery(go.id, { proceed: true, comment: 'Budget owner agrees' });
+    await h.pipelineEngine.confirmDiscovery(stop.id, { proceed: false });
     expect(h.runs.get(go.id)!.state).toBe('analyzing');
     expect(h.runs.get(stop.id)!.state).toBe('declined');
     expect(h.jobs.at(-1)?.job).toEqual({ runId: go.id, state: 'analyzing' });
@@ -194,14 +202,14 @@ describe('orchestrator', () => {
 
   it('retries a failing stage with backoff, then fails the run; a manual retry starts afresh', async () => {
     let calls = 0;
-    const h = harness({
+    const h = setupEngine({
       intake: async () => {
         calls++;
         throw new Error('Jira is down');
       },
     });
-    const run = await h.orchestrator.createRun('A feature that will fail');
-    await h.orchestrator.executeStage(h.jobs.shift()!.job);
+    const run = await h.pipelineEngine.createRun('A feature that will fail');
+    await h.pipelineEngine.executeStage(h.jobs.shift()!.job);
     expect(h.jobs[0]).toMatchObject({ delay: 5 });
     await h.drain();
     expect(calls).toBe(3);
@@ -211,19 +219,19 @@ describe('orchestrator', () => {
       error: 'Jira is down',
     });
 
-    await h.orchestrator.retry(run.id);
+    await h.pipelineEngine.retry(run.id);
     expect(h.runs.get(run.id)!.state).toBe('intake');
     expect(h.jobs).toHaveLength(1);
   });
 
   it('pauses on a usage limit and resumes later without counting a failure', async () => {
-    const h = harness({
+    const h = setupEngine({
       intake: async () => {
         throw new UsageLimitReached('Claude AI usage limit reached', null);
       },
     });
-    const run = await h.orchestrator.createRun('A feature during a busy hour');
-    await h.orchestrator.executeStage(h.jobs.shift()!.job);
+    const run = await h.pipelineEngine.createRun('A feature during a busy hour');
+    await h.pipelineEngine.executeStage(h.jobs.shift()!.job);
 
     expect(h.runs.get(run.id)!.state).toBe('intake');
     expect(h.jobs).toEqual([{ job: { runId: run.id, state: 'intake' }, delay: 900 }]);
@@ -232,14 +240,14 @@ describe('orchestrator', () => {
 
   it('ignores stale jobs and jobs for a run another worker holds', async () => {
     let free = true;
-    const h = harness(placeholderStages({ delayMs: 0, autoApprove: true }), { lockFree: () => free });
-    const run = await h.orchestrator.createRun('Duplicate jobs');
-    await h.orchestrator.executeStage({ runId: run.id, state: 'analyzing' }); // stale
+    const h = setupEngine(placeholderStages({ delayMs: 0, autoApprove: true }), { lockFree: () => free });
+    const run = await h.pipelineEngine.createRun('Duplicate jobs');
+    await h.pipelineEngine.executeStage({ runId: run.id, state: 'analyzing' }); // stale
     expect(h.executions).toHaveLength(0);
 
     free = false;
-    await h.orchestrator.executeStage({ runId: run.id, state: 'intake' }); // locked elsewhere
+    await h.pipelineEngine.executeStage({ runId: run.id, state: 'intake' }); // locked elsewhere
     expect(h.executions).toHaveLength(0);
-    await expect(h.orchestrator.retry(run.id)).rejects.toMatchObject({ status: 409 });
+    await expect(h.pipelineEngine.retry(run.id)).rejects.toMatchObject({ status: 409 });
   });
 });

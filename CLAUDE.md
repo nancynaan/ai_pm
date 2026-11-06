@@ -1,64 +1,53 @@
 # CLAUDE.md
 
-AI pipeline that does PM work for a Scrum game project (endless runner). A client describes a feature in a chat UI. The pipeline asks a short questionnaire, analyzes requirements, estimates effort, budget, value and risk, publishes PM documents to Confluence, presents the result to the client, and creates the Epic and user stories in Jira.
+AI pipeline that does PM work for a Scrum game project (endless runner). A client describes a feature in a chat UI. The pipeline asks a discovery questionnaire, analyzes requirements, estimates effort, budget, value and risk, publishes PM documents to Confluence, presents the result to the client, and creates the Epic and user stories in Jira.
 
-Design documents live **outside this repository**, in `../docs/`: BPMN models (`../docs/bpmn/viewer.html`) and `../docs/IMPLEMENTATION_PLAN.md`, which holds the phased delivery plan. Read the plan before starting a new phase.
+Design documents live **outside this repository**, in `../docs/`: the delivery plan (`IMPLEMENTATION_PLAN.md`, read it before a new phase), the phase history (`PROJECT_STATUS.md`) and the BPMN models (`bpmn/viewer.html`).
+
+Folders with their own `CLAUDE.md` (loaded when you work there): `apps/server/src/pipeline-engine`, `apps/web`, `agents`, `skills`, `config`.
 
 ## Layout
 
 - `apps/server`: Node.js 24 + TypeScript (Fastify, Drizzle/PostgreSQL).
-  - `src/harness` runs the pipeline: state machine (`states.ts`), orchestrator with per-run advisory locks, retries and usage-limit pauses, pg-boss stage jobs, event bus, stage handlers (`stages/`; placeholders remain for documents, presentation and backlog until Phases 5–7), and pure calculators (`calculators/`).
-  - `src/agents` runs agents: `runner.ts` (claude -p with a JSON schema, repair loop, limit detection), `registry.ts` (agents/_.agent.md and skills/_/SKILL.md).
-  - `src/integrations` talks to Atlassian (REST), Claude (CLI) and SMTP.
-  - `src/render` turns one Markdown source into Confluence storage format and Jira ADF.
-  - `src/sync` holds the idempotent publisher and the sync log.
-  - `src/baseline` seeds the demo project and loads the baseline and digest into the database.
-  - `src/api` exposes REST + SSE.
-- `apps/web`: React + Vite UI.
-- `packages/shared`: zod schemas and types used by both server and web.
-- `seed/baseline`: the demo project (Comet Run) as YAML data and Markdown pages with `{{value|table|list:name}}` placeholders. Numbers live only in the YAML.
-- `agents/`: agent definitions (`*.agent.md`). `skills/`: knowledge packages (`<name>/SKILL.md`). `config/`: YAML settings (`discovery.yaml`: questionnaire and completeness rules; later cadence and feasibility rules).
+  - `src/pipeline-engine`: the pipeline (state machine, engine, stages, discovery, assessment, calculators).
+  - `src/agents`: runs agents through `claude -p` (`runner.ts`) and loads their definitions (`registry.ts`, `schemas.ts`).
+  - `src/integrations` (Atlassian REST, Claude CLI, SMTP), `src/render` (Markdown → Confluence storage and Jira ADF), `src/sync` (idempotent publisher, sync log), `src/baseline` (demo project seed and digest), `src/api` (REST + SSE), `src/evals` (eval and demo CLIs).
+- `apps/web`: React + Vite UI. `packages/shared`: zod schemas and types for server and web.
+- `seed/baseline`: the demo project (Comet Run): YAML data and Markdown pages. Numbers live only in the YAML.
+- `agents/`, `skills/`: the product's runtime AI roles and their knowledge. `config/`: YAML settings. `evals/features.yaml`: sample features with client answer profiles.
+- `.claude/`: the development harness for Claude Code (not the product): permissions, hooks (format on edit; quality gate at the end of a turn; session status at start) and slash commands. Personal overrides go in `.claude/settings.local.json` (git-ignored). Start Claude Code in this folder so it loads.
 
 ## Rules
 
-- **The harness owns the flow.** Stages run in deterministic TypeScript. Agents return JSON validated with zod and have no side effects.
+- **The pipeline engine owns the flow.** Stages run in deterministic TypeScript; agents return JSON validated with zod and have no side effects.
 - **No arithmetic in prompts.** Estimates, forecasts, budgets, ROI and verdicts are computed in code; agents supply judgements.
-- **Assess only a verified discovery.** The client answers a fixed discovery questionnaire (`config/discovery.yaml`); rules in `harness/discovery.ts` plus the discovery-review agent produce the Discovery Completeness Report. Blocking contradictions and critical gaps stop the pipeline (clarification round, then a client decision on a preliminary assessment). Information is always labelled confirmed, client assumption, AI hypothesis or missing; missing or unproven information never becomes a fact, and estimates stay preliminary until the development team validates them.
-- **Atlassian writes only through the publisher** (`src/sync/publisher.ts`): idempotent via the sync log, unchanged payloads skipped, and nothing written in dry-run. In dry-run the gateway is created `readOnly`, which blocks every write request as a second safety net.
-- **Secrets stay in `.env`.** Never log tokens or authorization headers, and never commit `.env`.
-- **Claude runs through the Claude Code CLI on the user's Claude subscription. There is no Anthropic API key and no `@anthropic-ai/sdk`.** Agent calls spawn `claude -p` with `--tools ""` (no tools), `--json-schema`, `--output-format json` and `--model claude-opus-5-5`. The harness puts all Jira/Confluence context into the prompt, so agents never fetch anything themselves. Runs share the subscription's usage limits, so treat a "limit reached" answer as a pause, not a failure.
+- **Assess only a verified discovery.** Blocking contradictions and critical gaps stop the pipeline; missing or unproven information never becomes a fact; estimates stay preliminary until the development team validates them.
+- **Atlassian writes only through the publisher** (`src/sync/publisher.ts`): idempotent, nothing written in dry-run (the gateway is then `readOnly` too). Live writes only after a dry-run and the user's go-ahead.
+- **Secrets stay in `.env`.** Never read, log or commit it.
+- **Claude runs through the Claude Code CLI on the user's subscription; no Anthropic API key, no `@anthropic-ai/sdk`.** Agent calls run `claude -p` with `--tools ""`, `--json-schema`, `--output-format json`, `--model claude-opus-5-5`. A usage-limit answer is a pause, not a failure.
+- **Commit and push once per phase**, after verification and the user's OK.
 
 ## Conventions
 
-- ESM everywhere; relative imports end in `.js`. TypeScript strict, `verbatimModuleSyntax` (use `import type`).
-- Validate external data (env, HTTP responses, LLM output) with zod at the boundary.
+- ESM everywhere; relative imports end in `.js`. TypeScript strict, `verbatimModuleSyntax` (use `import type`). Kebab-case file names.
+- Validate external data (env, HTTP responses, LLM output, YAML) with zod at the boundary.
 - Tests sit next to the code as `*.test.ts` (Vitest). Inject `fetch`, clocks and clients instead of mocking modules.
 
 ## Commands
 
 ```bash
-npm install                # install all workspaces
-npm run dev                # server (tsx watch) + web (Vite on :5173); needs Postgres: docker compose up -d postgres mailpit
 npm test                   # Vitest
 npm run typecheck          # tsc -b over all projects
 npm run lint               # ESLint
 npm run build              # shared → server → web
-npm run db:generate        # new Drizzle migration after editing apps/server/src/db/schema.ts
-npm run seed               # seed the demo project (dry-run; add -- --live to write, -- --sync-only to re-read)
-docker compose up --build  # full stack: http://localhost:3000, Mailpit http://localhost:8025
-docker compose exec app node apps/server/dist/evals/cli.js --only rewarded-menu-chest       # eval (in memory, saves nothing)
-docker compose exec app node apps/server/dist/evals/demo-cli.js --only rewarded-menu-chest  # saved demo run via the API
+npm run dev                # server + web (Vite :5173); needs: docker compose up -d postgres mailpit
+npm run db:generate        # migration after editing apps/server/src/db/schema.ts
+npm run seed               # seed the demo project (dry-run; -- --live writes, -- --sync-only re-reads)
+docker compose up --build  # full stack: app :3000, Mailpit :8025, pgAdmin :5050
 ```
+
+Slash commands: `/rebuild` (build, restart, health), `/eval` (in-memory eval, default `rewarded-menu-chest`), `/demo` (saved demo run through the API), `/phase` (start the next phase from the plan).
 
 ## Status
 
-- Phase 0 (foundations) is done: workspaces, Docker Compose, config, migrations, and `/api/health`.
-- Phase 1 (Atlassian gateway and baseline seed) is done and seeded live.
-- Phase 2 (harness core) is done: runs go intake → completed with placeholder stages, survive a crash (interrupted attempts are retried), and stream events to the chat UI. `node apps/server/dist/agents/smoke-cli.js` makes one real Claude call.
-- Phase 3 (intake and analysis) is done: real agents for elicitation (question bank, at most 8 questions, one follow-up round for critical gaps), requirements analysis and impact analysis; draft Epic at intake; change-magnitude rule in `harness/magnitude.ts`; eval set in `evals/features.yaml` (`node apps/server/dist/evals/cli.js`).
-- Discovery questionnaire v2 (Phase 3 rework): 10 fixed questions in five areas (business justification, product context, scope, feasibility, decision readiness) plus up to 2 feature-specific questions and a comment; single/multi choice with limits, exclusive options and detail fields. After submission the Discovery Completeness Report (coverage, contradictions, gaps, findings by kind, confidence, decision readiness, next action) decides: complete / complete with assumptions → analysis; needs clarification → one clarification round; insufficient → the client continues with a preliminary assessment or stops (`awaiting_confirmation`). Evals v2 add client answer profiles and the expected discovery result per feature.
-- Eval status (questionnaire v1): 7/7 on change magnitude, at most 8 questions in round 1 and all four core questions asked. The first run was 3/7 (over-classification); the fixes were: low impacts never escalate, a calibration table in skills/impact-analysis, and "new save fields with defaults are Save System low; only a format change or data conversion is medium". One assessment takes about 4–5 minutes and 100–160k tokens. On a failure the eval prints the model's rationale for each medium/high rating.
-- Phase 4 (estimation, value, risk, verdict) is done: stage `estimating` runs the estimator, risk-analyst and value-analyst agents in parallel; `harness/assessment.ts` computes everything from their judgements with the calculators in `harness/calculators/` (PERT, seeded Monte Carlo forecast, sprint calendar, capacity and roadmap impact, labour budget + non-labour + EMV contingency, value scenarios with ROI/NPV/payback/break-even, WSJF, verdict rules). Settings in `config/feasibility-rules.yaml`. The assessment is stored as one typed document (`assessments` table, shared `assessmentSchema`) and shown on the **Analysis** tab (`#/analysis`, `#/analysis/<runId>`); the chat only gets an "Assessment ready" card. Defaults: start next sprint at 50 % capacity; budget limit = the client's limit or the remaining approved budget.
-- Phase 4 rules worth knowing: the forecast never runs faster than the busiest discipline (critical-resource constraint, so a "bottleneck" is planning information, not a condition); contingency = Σ risk EMV capped at 30 % of labour (overlapping risks double-count); a plain Go has no conditions (the team re-estimate is a standard next step shown on the Analysis tab); discovery confidence is "low" only for blocking issues, critical gaps or 4+ questions the client left open.
-- Evals by default: `--only rewarded-menu-chest,double-jump`, the demo pair (plain Go and No-Go). The others, including neon-menu-theme (cheap, but a menu theme does not pay back within a year), only on request.
-- Next is Phase 5: documents in Confluence.
+Phases 0–4 are done (Phase 4 = commit 6ab7b0c). Next is Phase 5: documents in Confluence. History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).

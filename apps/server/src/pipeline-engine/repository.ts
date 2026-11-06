@@ -56,9 +56,9 @@ function toQuestionnaire(row: typeof questionnaires.$inferSelect): Questionnaire
   });
 }
 
-/** All database access of the harness. */
+/** All database access of the pipeline engine. */
 export function createRunRepository(db: Db) {
-  // state and failedState are stored as text; only harness code writes them.
+  // state and failedState are stored as text; only pipeline engine code writes them.
   const toRun = (row: Record<string, unknown>) => row as unknown as RunRecord;
 
   return {

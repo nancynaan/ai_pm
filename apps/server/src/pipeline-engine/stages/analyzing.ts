@@ -2,7 +2,7 @@ import type { ImpactAnalysis, RequirementsAnalysis } from '../../agents/schemas.
 import { reportForPrompt } from '../discovery.js';
 import { classifyChange, MAGNITUDE_LABEL } from '../magnitude.js';
 import type { DiscoveryOutput } from './eliciting.js';
-import type { StageHandler } from '../orchestrator.js';
+import type { StageHandler } from '../engine.js';
 import type { StageServices } from '../services.js';
 import { clientRequest, section, transcript } from './prompts.js';
 
@@ -10,7 +10,7 @@ const BASELINE_FOR_REQUIREMENTS = ['game_design_document', 'definition_of_done',
 const BASELINE_FOR_IMPACT = ['architecture_overview', 'game_design_document'];
 
 /**
- * BPMN 02: requirements analysis and impact analysis run in parallel; the harness then applies
+ * BPMN 02: requirements analysis and impact analysis run in parallel; the pipeline engine then applies
  * the change-magnitude rule and stores everything with stable requirement codes.
  */
 export function analyzingStage(services: StageServices): StageHandler {

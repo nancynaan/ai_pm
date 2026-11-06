@@ -6,7 +6,7 @@ export interface StageJob {
   state: RunState;
 }
 
-/** Durable stage jobs. Retries are decided by the orchestrator, so the queue itself never retries. */
+/** Durable stage jobs. Retries are decided by the pipeline engine, so the queue itself never retries. */
 export interface StageQueue {
   start(): Promise<void>;
   enqueue(job: StageJob, delaySeconds?: number): Promise<void>;

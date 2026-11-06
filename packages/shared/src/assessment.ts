@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * The feature assessment (BPMN 03): estimates, release forecast, resources, budget, risks, value
- * and the verdict. Every number is computed by the harness; agents supply only judgements.
+ * and the verdict. Every number is computed by the pipeline engine; agents supply only judgements.
  * Shown on the Analysis tab; Phases 5–7 turn it into documents, slides and the backlog.
  */
 

@@ -12,7 +12,7 @@ export interface AppOptions {
   version: string;
   /** Reads the project baseline from the database. */
   baseline?: () => Promise<BaselineSummary>;
-  /** The pipeline: orchestrator, run repository and event bus. */
+  /** The pipeline: the pipeline engine, run repository and event bus. */
   runs?: RunRouteDeps;
   /** Built web UI to serve; omitted in dev, where Vite serves the UI. */
   webDistDir?: string;

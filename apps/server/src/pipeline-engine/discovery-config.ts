@@ -73,7 +73,7 @@ const rule = z
   .refine((r) => r.severity === 'warning' || r.clarify, 'A blocking rule needs a clarification question');
 export type DiscoveryRule = z.infer<typeof rule>;
 
-/** Questions the harness reads by id. */
+/** Questions the pipeline engine reads by id. */
 const REQUIRED_QUESTIONS = ['evidence', 'approval'];
 
 const configSchema = z

@@ -2,7 +2,7 @@ import type { Questionnaire } from '@ai-pm/shared';
 import type { ElicitationResult } from '../../agents/schemas.js';
 import { toUiQuestion } from '../discovery-config.js';
 import { FEATURE_PREFIX } from '../discovery.js';
-import type { StageHandler } from '../orchestrator.js';
+import type { StageHandler } from '../engine.js';
 import type { StageServices } from '../services.js';
 import { clientRequest, section, toQuestions } from './prompts.js';
 

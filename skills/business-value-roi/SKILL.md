@@ -16,11 +16,11 @@ A feature creates value through one or more drivers. Name the main one as the pr
 | More ad views         | rewarded_views_per_dau                    | % relative        |
 | More spend per player | arpdau                                    | % relative        |
 
-The harness converts the changes into DAU and ARPDAU effects with elasticities from config/feasibility-rules.yaml, applies them to the KPI baseline (and to the Business Case DAU target after the global launch), ramps them up after release, and computes revenue, ROI, NPV, payback and the break-even point. Do not compute money yourself.
+The pipeline engine converts the changes into DAU and ARPDAU effects with elasticities from config/feasibility-rules.yaml, applies them to the KPI baseline (and to the Business Case DAU target after the global launch), ramps them up after release, and computes revenue, ROI, NPV, payback and the break-even point. Do not compute money yourself.
 
 ## Plausible ranges (rule of thumb for this project)
 
-Effects of **one** feature on the **whole** game, before reach. Stay inside these unless the evidence says otherwise; the harness caps larger values and flags them.
+Effects of **one** feature on the **whole** game, before reach. Stay inside these unless the evidence says otherwise; the pipeline engine caps larger values and flags them.
 
 | Feature type                                    | Typical base effect                       | Optimistic   |
 | ----------------------------------------------- | ----------------------------------------- | ------------ |
@@ -46,7 +46,7 @@ Effects of **one** feature on the **whole** game, before reach. Stay inside thes
 - **Time criticality:** 1–3 with no date; 8–13 with a hard date or a seasonal window; 20 only when the value disappears after the date.
 - **Risk reduction or opportunity enablement:** how much it lowers project risk (for example retention risk R-01) or enables later features.
 
-The harness divides their sum by the job size from the estimate.
+The pipeline engine divides their sum by the job size from the estimate.
 
 ## Validating the hypothesis
 

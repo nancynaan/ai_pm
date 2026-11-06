@@ -7,13 +7,13 @@ import {
 } from '@ai-pm/shared';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import type { AnalysisRepository } from '../harness/analysis-repository.js';
-import type { EventBus } from '../harness/events.js';
-import { type Orchestrator, RunActionError } from '../harness/orchestrator.js';
-import type { RunRepository } from '../harness/repository.js';
+import type { AnalysisRepository } from '../pipeline-engine/analysis-repository.js';
+import type { EventBus } from '../pipeline-engine/events.js';
+import { type PipelineEngine, RunActionError } from '../pipeline-engine/engine.js';
+import type { RunRepository } from '../pipeline-engine/repository.js';
 
 export interface RunRouteDeps {
-  orchestrator: Orchestrator;
+  pipelineEngine: PipelineEngine;
   repo: RunRepository;
   bus: EventBus;
   /** Feature assessments for the Analysis tab. */
@@ -33,12 +33,12 @@ async function handle<T>(reply: FastifyReply, fn: () => Promise<T>) {
 }
 
 export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
-  // The orchestrator is looked up per request: it is created after the routes are registered.
+  // The pipeline engine is looked up per request: it is created after the routes are registered.
   const { repo, bus } = deps;
   app.post('/api/runs', async (request, reply) =>
     handle(reply, async () => {
       const { description } = createRunSchema.parse(request.body);
-      const run = await deps.orchestrator.createRun(description);
+      const run = await deps.pipelineEngine.createRun(description);
       return reply.code(201).send({ runId: run.id });
     }),
   );
@@ -71,7 +71,7 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
   app.post('/api/runs/:id/answers', async (request, reply) =>
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
-      await deps.orchestrator.submitAnswers(id, answersSchema.parse(request.body));
+      await deps.pipelineEngine.submitAnswers(id, answersSchema.parse(request.body));
       return { ok: true };
     }),
   );
@@ -79,7 +79,7 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
   app.post('/api/runs/:id/discovery-decision', async (request, reply) =>
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
-      await deps.orchestrator.confirmDiscovery(id, discoveryConfirmationSchema.parse(request.body));
+      await deps.pipelineEngine.confirmDiscovery(id, discoveryConfirmationSchema.parse(request.body));
       return { ok: true };
     }),
   );
@@ -87,7 +87,7 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
   app.post('/api/runs/:id/decision', async (request, reply) =>
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
-      await deps.orchestrator.decide(id, decisionSchema.parse(request.body));
+      await deps.pipelineEngine.decide(id, decisionSchema.parse(request.body));
       return { ok: true };
     }),
   );
@@ -95,7 +95,7 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
   app.post('/api/runs/:id/retry', async (request, reply) =>
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
-      await deps.orchestrator.retry(id);
+      await deps.pipelineEngine.retry(id);
       return { ok: true };
     }),
   );

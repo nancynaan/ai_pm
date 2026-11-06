@@ -13,7 +13,7 @@ import { loadAssessmentConfig } from '../assessment-config.js';
 import { loadDiscoveryConfig, toUiQuestion } from '../discovery-config.js';
 import { clarificationQuestion } from '../discovery.js';
 import { classifyChange } from '../magnitude.js';
-import type { StageContext } from '../orchestrator.js';
+import type { StageContext } from '../engine.js';
 import type { RunRecord, RunRepository } from '../repository.js';
 import type { StageServices } from '../services.js';
 import { analyzingStage } from './analyzing.js';

@@ -1,7 +1,7 @@
 # Discovery questionnaire and completeness rules (BPMN 01).
 #
 # The ten core questions are fixed, so every feature is assessed on the same basis. The elicitation
-# agent may add up to two feature-specific questions. After the client answers, the harness checks
+# agent may add up to two feature-specific questions. After the client answers, the pipeline engine checks
 # the answers with the rules below (contradictions, gaps, evidence) and the discovery-review agent
 # adds what rules cannot see. The pipeline goes on to the assessment only when nothing blocking is
 # left, or when the client explicitly accepts a preliminary assessment.
@@ -296,7 +296,7 @@ questions:
           approval: none,
         }
 
-# Contradictions the harness checks. `when` lists conditions that must all hold:
+# Contradictions the pipeline engine checks. `when` lists conditions that must all hold:
 # anyOf = the answer contains one of the values; noneOf = it contains none of them.
 # Blocking contradictions stop the pipeline until the client answers the clarification question.
 rules:
