@@ -1,6 +1,7 @@
 import { type Deck, type Presentation, presentationSchema } from '@ai-pm/shared';
 import { useEffect, useState } from 'react';
 import { api, errorText } from './api.js';
+import { FeatureTitle } from './FeatureTitle.js';
 
 /**
  * The client deck: three 16:9 slides with a professional dark look and subtle game touches
@@ -170,7 +171,7 @@ export function Slides({ deck }: { deck: Deck }) {
   ];
 }
 
-/** #/runs/<id>/presentation: the slide viewer with the PPTX download. */
+/** #/runs/<id>/presentation/slides: the slide viewer with the PPTX download. */
 export function PresentationView({ runId }: { runId: string }) {
   const [p, setP] = useState<Presentation | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +196,7 @@ export function PresentationView({ runId }: { runId: string }) {
   return (
     <>
       <p className="actions start">
-        <a href={`#/runs/${runId}`}>← Back to the chat</a>
+        <a href={`#/runs/${runId}/presentation`}>← Back to the presentation</a>
       </p>
       <div className="deck-viewer">{slides[index]}</div>
       <div className="actions deck-nav">
@@ -257,10 +258,32 @@ export function PresentationCard({ runId, label }: { runId: string; label: strin
         <a className="button" href={`/api/runs/${runId}/presentation.pptx`}>
           Download PPTX
         </a>
-        <a className="button primary" href={`#/runs/${runId}/presentation`}>
+        <a className="button primary" href={`#/runs/${runId}/presentation/slides`}>
           View slides
         </a>
       </p>
     </div>
+  );
+}
+
+/** #/runs/<id>/presentation: the Proposal card on its own. */
+export function PresentationTab({ runId }: { runId: string }) {
+  const [label, setLabel] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+  useEffect(() => {
+    api(`/api/runs/${runId}/presentation`, presentationSchema)
+      .then((p) => setLabel(p.deck.label))
+      .catch(() => setMissing(true));
+  }, [runId]);
+  return (
+    <>
+      <FeatureTitle runId={runId} />
+      {label && <PresentationCard runId={runId} label={label} />}
+      {missing && (
+        <p className="card muted">
+          No presentation yet. It is prepared after the documents are published.
+        </p>
+      )}
+    </>
   );
 }

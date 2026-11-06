@@ -36,6 +36,17 @@ const gap = z.object({
 
 export const ElicitationResult = z.object({
   summary: z.string().min(20).describe("The client's idea restated in two or three plain sentences"),
+  title: z
+    .string()
+    .min(10)
+    .max(60)
+    .refine((t) => {
+      const n = t.trim().split(/\s+/).length;
+      return n >= 4 && n <= 9;
+    }, 'Use 4–9 words')
+    .describe(
+      'The feature in about 6–8 words (at most 9), starting with a verb: what it does, e.g. "Add a free gift chest to the main menu". Shown as the feature name everywhere.',
+    ),
   epicSummary: z.string().min(5).max(80).describe('Title for the Jira Epic'),
   candidateRequirements: z
     .array(

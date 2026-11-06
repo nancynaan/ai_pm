@@ -26,7 +26,7 @@ const POSITION: Record<RunState, number> = {
   awaiting_documents: 4,
   documenting: 4,
   presenting: 5,
-  awaiting_decision: 6,
+  awaiting_decision: 5, // the decision belongs to the presentation step
   backlog: 6,
   completed: 7,
   declined: 6,
@@ -199,7 +199,7 @@ function EventItem({
             ))}
           </ul>
           <p className="actions">
-            <a className="button primary" href={`#/analysis/${run.id}`}>
+            <a className="button primary" href={`#/runs/${run.id}/analysis`}>
               Open on the Analysis tab
             </a>
           </p>
@@ -278,18 +278,13 @@ function DecisionCard({
           />
           {error && <p className="error">{error}</p>}
           <div className="actions">
-            <button type="button" disabled={sending} onClick={() => void decide('decline')}>
+            <button type="button" className="stop" disabled={sending} onClick={() => void decide('decline')}>
               Decline
             </button>
             <button type="button" disabled={sending} onClick={() => void decide('changes')}>
               Request changes
             </button>
-            <button
-              type="button"
-              className="primary"
-              disabled={sending}
-              onClick={() => void decide('approve')}
-            >
+            <button type="button" className="go" disabled={sending} onClick={() => void decide('approve')}>
               Approve
             </button>
           </div>

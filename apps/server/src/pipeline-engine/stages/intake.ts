@@ -29,6 +29,8 @@ export function intakeStage(services: StageServices): StageHandler {
       ].join('\n\n'),
     );
 
+    // The short title replaces the first line of the description as the feature's name.
+    await ctx.repo.setTitle(ctx.run.id, result.title);
     const epic = await services.createDraftEpic(ctx.run, result.epicSummary, result.summary);
     const featureQuestions = toQuestions(result.featureQuestions.slice(0, config.maxFeatureQuestions), {
       prefix: FEATURE_PREFIX,

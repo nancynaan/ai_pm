@@ -1,31 +1,64 @@
 :root {
-  --bg: #f5f6f8;
-  --surface: #ffffff;
-  --text: #1b2130;
-  --muted: #5a6375;
-  --border: #dadfe6;
-  --ok-bg: #e3f4e8;
-  --ok-text: #1d6b37;
-  --warn-bg: #fdf1dc;
-  --warn-text: #8a5a00;
-  --err-bg: #fce6e4;
-  --err-text: #a1271b;
+  /* Warm ivory surfaces and deep slate ink on a sand-to-slate gradient. */
+  --page-from: #decba4;
+  --page-to: #3e5151;
+  --bg: #ebe5da; /* inset wells: inputs, code, inner panels */
+  --surface: #f8f5ef;
+  --surface-glass: rgba(248, 245, 239, 0.9);
+  --text: #1e2a2b;
+  --muted: #5b6564;
+  --border: rgba(62, 81, 81, 0.16);
+  --edge: rgba(255, 255, 255, 0.55); /* the light edge of a raised surface */
+  --ok-bg: #e2efe6;
+  --ok-text: #1f6a3c;
+  --warn-bg: #f6ecd6;
+  --warn-text: #7d5410;
+  --err-bg: #f7e3e0;
+  --err-text: #9b2c22;
+  /* Client bubbles: a muted steel navy that sits calmly on the warm gradient. */
+  --client-bg: #2f4c6b;
+  --client-text: #f4f7fb;
+  --client-muted: #d6e0ec;
+  /* Light neumorphism: a soft shadow below-right and a faint highlight above-left. */
+  --raise: 10px 10px 26px rgba(28, 40, 40, 0.22), -6px -6px 18px rgba(255, 255, 255, 0.3);
+  --raise-sm: 5px 5px 14px rgba(28, 40, 40, 0.18), -4px -4px 10px rgba(255, 255, 255, 0.28);
+  --press: inset 3px 3px 7px rgba(28, 40, 40, 0.14), inset -3px -3px 7px rgba(255, 255, 255, 0.75);
+  /* The navigation bar: the darkest surface, in both modes. */
+  --nav-bg: #30231c; /* dark chocolate */
+  /* The bar over scrolling content: nav-bg at 90 % (tab text stays >= 5.2:1 over ivory). */
+  --nav-glass: rgba(48, 35, 28, 0.9);
+  --nav-text: #f4eee7;
+  --nav-muted: #c8bbae;
+  --nav-active: #8fb4e3; /* the client-bubble blue, lighter */
+  /* Actions: go ahead (publish, approve) and stop (decline). White text >= 4.5:1. */
+  --go-bg: #23864e;
+  --go-bg-hover: #1e7543;
+  --stop-bg: #b8352a;
+  --stop-bg-hover: #a12e24;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #13161b;
-    --surface: #1c2027;
-    --text: #e5e8ee;
-    --muted: #9aa3b3;
-    --border: #2d333d;
-    --ok-bg: #173323;
-    --ok-text: #7fd39b;
-    --warn-bg: #3a2d12;
-    --warn-text: #f0c46c;
-    --err-bg: #3d1d1a;
-    --err-text: #f29a90;
+    --bg: #233131;
+    --surface: #2d3c3c;
+    --surface-glass: rgba(45, 60, 60, 0.9);
+    --text: #e8eeec;
+    --muted: #b1bdba;
+    --border: rgba(255, 255, 255, 0.09);
+    --edge: rgba(255, 255, 255, 0.07);
+    --ok-bg: #1d3a2a;
+    --ok-text: #8fd6a8;
+    --warn-bg: #3d3018;
+    --warn-text: #f0c879;
+    --err-bg: #43231f;
+    --err-text: #f2a198;
+    --client-bg: #36577c;
+    --client-text: #f3f6fb;
+    --client-muted: #d3deec;
+    --raise: 10px 10px 26px rgba(0, 0, 0, 0.38), -5px -5px 16px rgba(255, 255, 255, 0.05);
+    --raise-sm: 5px 5px 14px rgba(0, 0, 0, 0.32), -3px -3px 10px rgba(255, 255, 255, 0.04);
+    --press: inset 3px 3px 7px rgba(0, 0, 0, 0.35), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
   }
 }
 
@@ -203,7 +236,7 @@ pre {
 /* ---- layout & navigation ---- */
 header.top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
@@ -394,8 +427,17 @@ ul.runs li a {
 
 .bubble.client {
   align-self: flex-end;
-  background: var(--ok-bg);
+  background: var(--client-bg);
+  color: var(--client-text);
   border-color: transparent;
+}
+
+.bubble.client .who {
+  color: var(--client-muted);
+}
+
+.bubble.client a {
+  color: inherit;
 }
 
 .bubble .who {
@@ -1542,4 +1584,212 @@ table.risks td {
 
 .deck-nav {
   justify-content: center;
+}
+
+/* ---- feature screens ---- */
+
+.feature-title {
+  margin: 24px 0 0;
+  font-size: 20px;
+}
+
+/* ==== Theme: gradient page, light neumorphism (overrides the base rules above) ==== */
+
+body {
+  min-height: 100vh;
+  background: var(--page-to); /* fallback for old browsers */
+  background: -webkit-linear-gradient(to right, var(--page-from), var(--page-to));
+  background: linear-gradient(to right, var(--page-from), var(--page-to));
+  background-attachment: fixed;
+}
+
+/* Raised surfaces: cards and chat bubbles. */
+.card {
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  box-shadow: var(--raise);
+}
+
+.bubble {
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  box-shadow: var(--raise-sm);
+}
+
+.bubble.ai {
+  border-top-left-radius: 6px;
+}
+
+.bubble.client {
+  border-color: transparent;
+  border-top-right-radius: 6px;
+  box-shadow:
+    6px 6px 16px rgba(20, 34, 52, 0.28),
+    -3px -3px 10px rgba(255, 255, 255, 0.18);
+}
+
+/* Buttons rise slightly and press in. */
+button,
+a.button {
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  box-shadow: var(--raise-sm);
+  transition: box-shadow 0.15s ease;
+}
+
+button:not(:disabled):active,
+a.button:active {
+  box-shadow: var(--press);
+}
+
+button.link {
+  box-shadow: none;
+  border: none;
+}
+
+/* Fields sit in inset wells. */
+textarea,
+input,
+select,
+pre {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: var(--press);
+}
+
+/* Text that would otherwise sit on the gradient gets a frosted backing. */
+header.top {
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--nav-glass);
+  color: var(--nav-text);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  backdrop-filter: blur(16px) saturate(130%);
+  box-shadow: var(--raise-sm);
+}
+
+.feature-title,
+main > p,
+main > .actions,
+.deck-nav,
+.chat > .system {
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--raise-sm);
+}
+
+.feature-title {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--edge);
+}
+
+main > .actions,
+.deck-nav {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.chat > .system {
+  align-self: center;
+}
+
+main > p.card {
+  width: auto;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.deck-viewer .slide {
+  box-shadow: var(--raise);
+}
+
+/* Navigation tabs on the dark bar: the current one in light blue. */
+header.top nav a {
+  color: var(--nav-muted);
+}
+
+header.top nav a:hover {
+  color: var(--nav-text);
+}
+
+header.top nav a[aria-current='page'] {
+  color: var(--nav-active);
+  border-bottom-color: var(--nav-active);
+}
+
+/* Go-ahead and stop actions (publish, approve; decline). */
+button.go,
+button.stop {
+  color: #ffffff;
+  border-color: transparent;
+}
+
+button.go {
+  background: var(--go-bg);
+}
+
+button.go:not(:disabled):hover {
+  background: var(--go-bg-hover);
+}
+
+button.stop {
+  background: var(--stop-bg);
+}
+
+button.stop:not(:disabled):hover {
+  background: var(--stop-bg-hover);
+}
+
+/* Anchored jumps (scrollIntoView, #links) stop below the pinned bar. */
+html {
+  scroll-padding-top: 96px;
+}
+
+/* ---- Page frame: #root holds the pinned bar and the content ---- */
+
+#root {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 16px 0;
+}
+
+#root.wide {
+  max-width: 1120px;
+}
+
+main,
+main.wide {
+  max-width: none;
+  margin: 0;
+  padding: 24px 0 32px;
+}
+
+/* The bar sticks at the very top while the page scrolls, in both directions. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+/* A short blur that fades out below the bar, so content slides under it smoothly. */
+.topbar-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 20px;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
 }

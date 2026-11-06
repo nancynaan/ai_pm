@@ -175,3 +175,15 @@ describe('agent registry', () => {
     expect(() => buildAgentSpec(definition, { defaultModel: 'x', schemas: {} })).toThrow(/no output schema/);
   });
 });
+
+describe('elicitation title', () => {
+  it('accepts a short verb-first name of 4–9 words and rejects longer or shorter ones', async () => {
+    const { ElicitationResult } = await import('./schemas.js');
+    const title = ElicitationResult.shape.title;
+    expect(title.safeParse('Add a free gift chest to the main menu').success).toBe(true); // 9 words
+    expect(title.safeParse('Add a free daily gift chest to the main game menu').success).toBe(false); // 11
+    expect(title.safeParse('Add a gift chest to the menu').success).toBe(true);
+    expect(title.safeParse('Add free gift chest to main menu').success).toBe(true);
+    expect(title.safeParse('Gift chest').success).toBe(false);
+  });
+});

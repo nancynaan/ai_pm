@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { api, errorText } from './api.js';
+import { FeatureTitle } from './FeatureTitle.js';
 import { Markdown } from './Markdown.js';
 
 const STATUS: Record<DocumentStatus, { label: string; tone: 'ok' | 'warn' | 'neutral' }> = {
@@ -31,11 +32,19 @@ export function DocumentsCard({ runId, version }: { runId: string; version: numb
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     api(`/api/runs/${runId}/documents`, documentSetSchema)
       .then(setSet)
       .catch((err: unknown) => setError(errorText(err)));
-  }, [runId, version]);
+  }, [runId, version, tick]);
+  // While the documents step runs (or right after the button), check again every few seconds.
+  const waiting = busy || set?.running;
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => setTick((t) => t + 1), 4000);
+    return () => clearInterval(timer);
+  }, [waiting]);
 
   async function publish() {
     setBusy(true);
@@ -117,7 +126,7 @@ export function DocumentsCard({ runId, version }: { runId: string; version: numb
         ) : (
           <button
             type="button"
-            className="primary"
+            className="go"
             disabled={!set.canPublish || busy}
             onClick={() => void publish()}
           >
@@ -142,7 +151,7 @@ export function DocumentPreview({ runId, type }: { runId: string; type: string }
   return (
     <>
       <p className="actions start">
-        <a href={`#/runs/${runId}`}>← Back to the chat</a>
+        <a href={`#/runs/${runId}/documents`}>← Back to the documents</a>
       </p>
       {error && <p className="error">Could not load the document: {error}</p>}
       {doc && (
@@ -154,6 +163,16 @@ export function DocumentPreview({ runId, type }: { runId: string; type: string }
           <Markdown source={doc.markdown} />
         </section>
       )}
+    </>
+  );
+}
+
+/** #/runs/<id>/documents: the Documents card on its own. */
+export function DocumentsTab({ runId }: { runId: string }) {
+  return (
+    <>
+      <FeatureTitle runId={runId} />
+      <DocumentsCard runId={runId} version={0} />
     </>
   );
 }

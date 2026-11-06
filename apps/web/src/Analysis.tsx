@@ -81,7 +81,7 @@ export function AnalysisList() {
             {items.map((a) => (
               <tr key={a.runId}>
                 <td>
-                  <a href={`#/analysis/${a.runId}`}>{a.title}</a>
+                  <a href={`#/runs/${a.runId}/analysis`}>{a.title}</a>
                 </td>
                 <td>
                   <VerdictTag decision={a.decision} label={a.label} />
@@ -120,9 +120,6 @@ export function AnalysisView({ runId }: { runId: string }) {
     return (
       <section className="card">
         <p className="error">{error}</p>
-        <p>
-          <a href={`#/runs/${runId}`}>Back to the chat</a> · <a href="#/analysis">All assessments</a>
-        </p>
       </section>
     );
   if (!a) return <p className="muted">Loading…</p>;
@@ -135,16 +132,12 @@ export function AnalysisView({ runId }: { runId: string }) {
   return (
     <>
       <section className="card">
-        <p className="crumbs">
-          <a href="#/analysis">Analysis</a> › {a.title}
-        </p>
         <div className="card-head">
           <h2>{a.title}</h2>
           <VerdictTag decision={a.verdict.decision} label={a.verdict.label} />
         </div>
         <p className="meta">
-          Assessed {new Date(a.createdAt).toLocaleString('en-GB')} · {a.inputs.magnitude.replace('_', ' ')} ·{' '}
-          <a href={`#/runs/${a.runId}`}>Open the chat</a>
+          Assessed {new Date(a.createdAt).toLocaleString('en-GB')} · {a.inputs.magnitude.replace('_', ' ')}
         </p>
         {a.preliminary && (
           <p className="banner warn">

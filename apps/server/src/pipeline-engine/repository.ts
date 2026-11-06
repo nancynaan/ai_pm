@@ -306,6 +306,15 @@ export function createRunRepository(db: Db) {
       return row?.output ?? null;
     },
 
+    /** The feature's short name (from intake), shown as its title everywhere. */
+    async setTitle(runId: string, title: string) {
+      const [run] = await db
+        .select({ requestId: pipelineRuns.featureRequestId })
+        .from(pipelineRuns)
+        .where(eq(pipelineRuns.id, runId));
+      if (run) await db.update(featureRequests).set({ title }).where(eq(featureRequests.id, run.requestId));
+    },
+
     /** When the stage last succeeded; null if it never did. */
     async lastSucceededAt(runId: string, stage: RunState): Promise<Date | null> {
       const [row] = await db

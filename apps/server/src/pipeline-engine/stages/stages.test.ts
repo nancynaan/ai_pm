@@ -224,11 +224,13 @@ function setup(
     questionnaires: { round: number; ids: string[]; sections?: string[] }[];
     analysis?: AnalysisToSave;
     assumptions?: { kind?: string }[];
+    title?: string;
   } = {
     questionnaires: [],
   };
   const answered = state.answered ?? [];
   const repo = {
+    setTitle: async (_id: string, title: string) => void (saved.title = title),
     latestStageOutput: async () => state.stageOutput ?? null,
     answeredQuestionnaires: async () => answered,
     latestDecision: async (_id: string, gate = 'assessment') =>
@@ -289,6 +291,7 @@ function setup(
 
 const elicitation: ElicitationResult = {
   summary: "Players race a transparent ghost of a friend's best run.",
+  title: "Race against a friend's ghost run",
   epicSummary: 'Ghost race against friends',
   candidateRequirements: [{ text: 'Show the ghost of a friend', type: 'functional', source: 'stated' }],
   gaps: [{ topic: 'netcode', description: 'Whether ghosts must sync live', critical: false }],
@@ -301,6 +304,7 @@ describe('intake stage', () => {
     const outcome = await intakeStage(services)(ctx);
 
     expect(outcome.next).toBe('awaiting_answers');
+    expect(saved.title).toBe("Race against a friend's ghost run"); // the short name replaces the first line
     expect(prompts.elicitation).toContain(
       "<client_request>\nRace against a friend's ghost.\n</client_request>",
     );

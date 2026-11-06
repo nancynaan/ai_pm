@@ -79,6 +79,7 @@ function memoryRun(calls: CallRecord[]) {
     latestDecision: async (_id: string, gate = 'assessment') =>
       gate === 'discovery' ? discoveryDecision : null,
     recordCall: async (_r: string, _e: string, call: CallRecord) => void calls.push(call),
+    setTitle: async () => undefined,
     async saveQuestionnaire(
       _id: string,
       round: number,
