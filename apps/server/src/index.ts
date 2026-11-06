@@ -15,6 +15,10 @@ import { createDocumentPublisher } from './pipeline-engine/documents/publish.js'
 import { createDocumentRepository } from './pipeline-engine/documents/repository.js';
 import { loadTemplates } from './pipeline-engine/documents/templates.js';
 import { documentingStage } from './pipeline-engine/stages/documenting.js';
+import { recordDecision } from './pipeline-engine/documents/decision.js';
+import { createPresentationRepository } from './pipeline-engine/presentation/repository.js';
+import { PPTX_TYPE, presentingStage } from './pipeline-engine/stages/presenting.js';
+import { createPublisher } from './sync/publisher.js';
 import { createContextBuilder } from './pipeline-engine/context.js';
 import { createEventBus } from './pipeline-engine/events.js';
 import { createPipelineEngine } from './pipeline-engine/engine.js';
@@ -64,6 +68,7 @@ async function main() {
   const repo = createRunRepository(db);
   const analysis = createAnalysisRepository(db);
   const documentRepo = createDocumentRepository(db);
+  const presentationRepo = createPresentationRepository(db);
   const bus = createEventBus(repo);
   // Created after the database is ready; routes only receive requests after listen().
   const pipeline: { pipelineEngine?: ReturnType<typeof createPipelineEngine> } = {};
@@ -81,6 +86,7 @@ async function main() {
       bus,
       assessments: analysis,
       documents: { repo: documentRepo, mode: config.atlassian.writeMode },
+      presentations: presentationRepo,
     },
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
   });
@@ -141,6 +147,53 @@ async function main() {
       .digest('hex'),
   };
 
+  // Stage 05: the three-slide client deck, its PPTX on the Feature Brief, and the decision gate.
+  const presenter = definitions.get('presenter');
+  if (!presenter) throw new Error('agents/presenter.agent.md is missing');
+  const jiraPublisher = () =>
+    stageGateway && config.atlassian.jiraProjectKey
+      ? createPublisher({
+          gateway: stageGateway,
+          store: drizzleSyncLog(db),
+          mode: config.atlassian.writeMode,
+          jiraProjectKey: config.atlassian.jiraProjectKey,
+        })
+      : null;
+  const presentationServices = {
+    repo: presentationRepo,
+    documents: documentRepo,
+    autoApprove: config.pipeline.clientGateAutoApprove,
+    presenterVersion: createHash('sha256')
+      .update(JSON.stringify(presenter))
+      .update(presenter.skills.map((name) => loadSkill(name).body).join('\n'))
+      .digest('hex'),
+    async attach(input: {
+      runId: string;
+      pageId: string;
+      fileName: string;
+      data: Uint8Array;
+      contentHash: string;
+    }) {
+      const publisher = jiraPublisher();
+      if (!publisher) return { status: 'skipped', url: null };
+      const r = await publisher.upsertAttachment({
+        key: `run:${input.runId}:deck`,
+        pageId: input.pageId,
+        fileName: input.fileName,
+        data: input.data,
+        contentType: PPTX_TYPE,
+        contentHash: input.contentHash,
+      });
+      // Opens the Feature Brief with the deck's preview; before the first upload, the Brief itself.
+      const attachmentId = r.externalId.startsWith('att') ? r.externalId.slice(3) : null;
+      const brief = `${config.atlassian.siteUrl}/wiki/pages/viewpage.action?pageId=${input.pageId}`;
+      const url = attachmentId
+        ? `${brief}&preview=/${input.pageId}/${attachmentId}/${encodeURIComponent(input.fileName)}`
+        : (r.url ?? null);
+      return { status: r.action.replace(' ', '_'), url };
+    },
+  };
+
   const pipelineEngine = createPipelineEngine({
     repo,
     bus,
@@ -157,8 +210,25 @@ async function main() {
       analyzing: analyzingStage(services),
       estimating: estimatingStage(services),
       documenting: documentingStage({ ...services, documents: documentServices }),
+      presenting: presentingStage({ ...services, presentation: presentationServices }),
     },
     log: app.log,
+    // The Decision Log: the decision goes to the Feature Brief and the Assumption Log block.
+    onDecision: (run, decision) =>
+      recordDecision(
+        {
+          analysis,
+          context: services.context,
+          repo,
+          documents: documentRepo,
+          publisher: documentServices.publisher,
+          templates,
+          closeEpic: (key) =>
+            jiraPublisher()?.ensureStatus(key, 'done') ?? Promise.resolve('no transition' as const),
+        },
+        run,
+        decision,
+      ),
   });
   pipeline.pipelineEngine = pipelineEngine;
   await pipelineEngine.start();

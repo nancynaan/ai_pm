@@ -289,6 +289,66 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
     },
 
     /**
+     * Attaches a file to a page under a fixed name: the first upload creates it, a changed file
+     * becomes a new version of the same attachment, an unchanged one is skipped. Never two files.
+     */
+    async upsertAttachment(input: {
+      key: string;
+      pageId: string;
+      fileName: string;
+      data: Uint8Array;
+      contentType: string;
+      /** Hash of what the file shows; the bytes of a regenerated PPTX differ even when it does not. */
+      contentHash: string;
+    }): Promise<SyncResult & { version: number | null }> {
+      const idempotencyKey = `confluence:attachment:${input.key}`;
+      const base = { kind: 'page' as const, label: input.fileName };
+      const url = `${gateway.siteUrl}/wiki/pages/viewpageattachments.action?pageId=${input.pageId}`;
+      if (isPlaceholder(input.pageId)) {
+        return {
+          ...record({ ...base, action: 'would create', externalId: placeholder(input.key) }),
+          version: null,
+        };
+      }
+      const entry = await store.get(idempotencyKey);
+      const existing = await gateway.confluence.findAttachment(input.pageId, input.fileName);
+      if (existing && entry?.payloadHash === input.contentHash) {
+        return {
+          ...record({ ...base, action: 'unchanged', externalId: existing.id, url }),
+          version: existing.version?.number ?? null,
+        };
+      }
+      if (!live) {
+        const action: SyncAction = existing ? 'would update' : 'would create';
+        return {
+          ...record({ ...base, action, externalId: existing?.id ?? placeholder(input.key), url }),
+          version: null,
+        };
+      }
+      const saved = await gateway.confluence.uploadAttachment(
+        input.pageId,
+        input.fileName,
+        input.data,
+        input.contentType,
+        existing?.id,
+      );
+      const action: SyncAction = existing ? 'updated' : 'created';
+      await store.save({
+        idempotencyKey,
+        system: 'confluence',
+        entityType: 'attachment',
+        externalId: saved.id,
+        externalVersion: saved.version?.number ?? null,
+        payloadHash: input.contentHash,
+        lastAction: action,
+      });
+      return {
+        ...record({ ...base, action, externalId: saved.id, url }),
+        version: saved.version?.number ?? null,
+      };
+    },
+
+    /**
      * Writes our block on a shared page (Risk Register, Assumption Log) between two anchors: the
      * block is replaced on a re-run, appended the first time, and the rest of the page is left
      * exactly as it is. Written only when the page would change.

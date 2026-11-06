@@ -132,15 +132,24 @@ export const llmCalls = pgTable('llm_calls', {
 });
 
 /** The run's event stream (chat messages, stage progress, questionnaires); replayed on reload. */
-export const runEvents = pgTable('run_events', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  runId: uuid('run_id')
-    .notNull()
-    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
-  type: text('type').notNull(),
-  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const runEvents = pgTable(
+  'run_events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    /**
+     * A step's block (e.g. "presentation", "decision"): publishing it again rewrites this row in
+     * place, so the chat shows each step once, where it first appeared. Null for ordinary events.
+     */
+    key: text('key'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique('run_events_run_key').on(t.runId, t.key)],
+)
 
 export const questionnaires = pgTable(
   'questionnaires',
@@ -335,3 +344,20 @@ export const documents = pgTable(
   },
   (t) => [unique('documents_run_type').on(t.runId, t.type)],
 );
+
+/** The client presentation of a run (stage 05): the deck, its version and the PPTX attachment. */
+export const presentations = pgTable('presentations', {
+  runId: uuid('run_id')
+    .primaryKey()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  /** Major.minor; the minor goes up each time the deck is regenerated for a changed assessment. */
+  version: text('version').notNull(),
+  /** Hash of the presenter's inputs; the same hash reuses the stored wording. */
+  inputHash: text('input_hash').notNull(),
+  draft: jsonb('draft').$type<unknown>().notNull(),
+  deck: jsonb('deck').$type<unknown>().notNull(),
+  /** created | updated | unchanged | would_create | would_update | skipped */
+  attachmentStatus: text('attachment_status'),
+  attachmentUrl: text('attachment_url'),
+  ...timestamps,
+});

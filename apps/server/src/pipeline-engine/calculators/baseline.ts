@@ -30,3 +30,13 @@ export function baselineImpact(input: {
 /** A roadmap proposal is needed when the feature delays a committed release or the launch target. */
 export const needsRoadmapProposal = (impact: Assessment['roadmapImpact']) =>
   impact.delaySprints > 0 || impact.launchAtRisk;
+
+/**
+ * A KPI's value after a scenario's change, for the client's KPI impact chart: `%` is a relative
+ * change, `pts` adds percentage points to a ratio, `min` adds minutes.
+ */
+export function kpiAfterChange(baseline: number, change: number, unit: string): number {
+  if (unit === '%') return baseline * (1 + change / 100);
+  if (unit === 'pts') return baseline + change / 100;
+  return baseline + change;
+}

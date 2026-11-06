@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { api, errorText } from './api.js';
 import { DiscoveryDecisionCard, DiscoveryReportCard, QuestionnaireCard } from './Discovery.js';
 import { DocumentsCard } from './Documents.js';
+import { PresentationCard } from './Presentation.js';
 import { STATE_LABEL } from './labels.js';
 import { RichText } from './RichText.js';
 
@@ -72,7 +73,12 @@ export function RunView({ runId }: { runId: string }) {
     const source = new EventSource(`/api/runs/${runId}/events`);
     source.addEventListener('run', (message) => {
       const stored = storedRunEventSchema.parse(JSON.parse((message as MessageEvent<string>).data));
-      setEvents((prev) => (prev.some((e) => e.id === stored.id) ? prev : [...prev, stored]));
+      // A step's block that was published again keeps its id: update it where it is.
+      setEvents((prev) =>
+        prev.some((e) => e.id === stored.id)
+          ? prev.map((e) => (e.id === stored.id ? stored : e))
+          : [...prev, stored],
+      );
       if (stored.event.type === 'state' || stored.event.type === 'questionnaire') refresh();
       if (stored.event.type === 'state' || stored.event.type === 'documents') setDocsVersion((v) => v + 1);
     });
@@ -81,8 +87,13 @@ export function RunView({ runId }: { runId: string }) {
 
   // The discovery decision belongs to the latest report.
   const lastReportId = [...events].reverse().find((e) => e.event.type === 'discovery_report')?.id;
-  // The Documents card sits right below the latest assessment.
-  const lastAssessmentId = [...events].reverse().find((e) => e.event.type === 'assessment_ready')?.id;
+  // The Documents card sits below the client's request to publish them, or below the latest
+  // assessment until that request exists.
+  const documentsAnchorId =
+    [...events].reverse().find((e) => e.key === 'documents.request')?.id ??
+    [...events].reverse().find((e) => e.event.type === 'assessment_ready')?.id;
+  // Only the latest decision card takes a decision; earlier ones are history.
+  const lastDecisionId = [...events].reverse().find((e) => e.event.type === 'decision_requested')?.id;
 
   if (error) return <p className="error">Could not load the run: {error}</p>;
   if (!run) return <p className="muted">Loading…</p>;
@@ -107,8 +118,13 @@ export function RunView({ runId }: { runId: string }) {
       <section className="chat" aria-live="polite">
         {events.map((stored) => (
           <Fragment key={stored.id}>
-            <EventItem stored={stored} run={run} lastReportId={lastReportId} />
-            {stored.id === lastAssessmentId && <DocumentsCard runId={run.id} version={docsVersion} />}
+            <EventItem
+              stored={stored}
+              run={run}
+              lastReportId={lastReportId}
+              lastDecisionId={lastDecisionId}
+            />
+            {stored.id === documentsAnchorId && <DocumentsCard runId={run.id} version={docsVersion} />}
           </Fragment>
         ))}
         {run.state === 'completed' && <p className="banner ok">This feature request is complete.</p>}
@@ -129,10 +145,12 @@ function EventItem({
   stored,
   run,
   lastReportId,
+  lastDecisionId,
 }: {
   stored: StoredRunEvent;
   run: RunSummary;
   lastReportId: number | undefined;
+  lastDecisionId: number | undefined;
 }) {
   const { event } = stored;
   switch (event.type) {
@@ -193,7 +211,7 @@ function EventItem({
           runId={run.id}
           verdict={event.verdict}
           highlights={event.highlights}
-          open={run.state === 'awaiting_decision'}
+          open={run.state === 'awaiting_decision' && stored.id === lastDecisionId}
         />
       );
     case 'stage':
@@ -203,6 +221,8 @@ function EventItem({
           {event.detail ? `: ${event.detail}` : ''}
         </p>
       ) : null;
+    case 'presentation_ready':
+      return <PresentationCard runId={run.id} label={event.label} />;
     case 'state':
     case 'documents':
       return null;

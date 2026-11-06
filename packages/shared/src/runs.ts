@@ -206,6 +206,8 @@ export const runEventSchema = z.discriminatedUnion('type', [
     published: z.number().int(),
     mode: z.enum(['dry-run', 'live']),
   }),
+  /** The three-slide deck is ready; the card links to the slide viewer and the PPTX. */
+  z.object({ type: z.literal('presentation_ready'), version: z.string(), label: z.string() }),
   z.object({
     type: z.literal('decision_requested'),
     verdict: z.string(),
@@ -219,6 +221,10 @@ export const storedRunEventSchema = z.object({
   id: z.number().int(),
   createdAt: z.string(),
   event: runEventSchema,
+  /** The event rewrote an earlier one with the same id (a step's block, updated in place). */
+  replaced: z.boolean().optional(),
+  /** The step this event belongs to (e.g. documents.request); absent for ordinary events. */
+  key: z.string().optional(),
 });
 export type StoredRunEvent = z.infer<typeof storedRunEventSchema>;
 

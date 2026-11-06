@@ -13,7 +13,8 @@ export interface StageContext {
   executionId: string;
   repo: RunRepository;
   baselineDigest: string | null;
-  emit: (event: RunEvent) => Promise<void>;
+  /** `key` marks a step's block: emitting it again rewrites the earlier one in place. */
+  emit: (event: RunEvent, key?: string) => Promise<void>;
 }
 
 export interface StageOutcome {
@@ -47,6 +48,11 @@ export interface PipelineEngineOptions {
   retryDelaySeconds?: number;
   /** Fallback pause when Claude's usage limit gives no reset time. */
   limitPauseSeconds?: number;
+  /**
+   * After the client's decision is saved: records it outside the pipeline (Decision Log in
+   * Confluence, closing a declined Epic). Its message goes to the chat; a failure only logs.
+   */
+  onDecision?: (run: RunRecord, decision: Decision['decision']) => Promise<string | null>;
 }
 
 const titleOf = (description: string) => {
@@ -104,7 +110,7 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
 
       const stage = run.state;
       const execution = await repo.startExecution(run.id, stage);
-      const emit = async (event: RunEvent) => void (await bus.publish(run.id, event));
+      const emit = async (event: RunEvent, key?: string) => void (await bus.publish(run.id, event, key));
       await emit({ type: 'stage', stage, status: 'started' });
       log.info({ runId: run.id, stage, attempt: execution.attempt }, 'stage started');
 
@@ -235,18 +241,40 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
     },
 
     async decide(runId: string, { decision, comment }: Decision) {
-      return act(runId, async (run) => {
+      const decided = await act(runId, async (run) => {
         if (run.state !== 'awaiting_decision')
           throw new RunActionError(`The run is ${run.state}, not waiting for a decision`, 409);
         await repo.saveDecision(run.id, decision, comment);
         const label = { approve: 'Approve', changes: 'Request changes', decline: 'Decline' }[decision];
-        await bus.publish(run.id, {
-          type: 'message',
-          role: 'client',
-          text: comment ? `${label}: ${comment}` : label,
-        });
+        await bus.publish(
+          run.id,
+          { type: 'message', role: 'client', text: comment ? `${label}: ${comment}` : label },
+          'decision.response',
+        );
         await moveTo(run, stateAfterDecision(decision));
+        return run;
       });
+      // Outside the run lock: a slow Confluence write never blocks the client's click.
+      if (opts.onDecision) {
+        void opts
+          .onDecision(decided, decision)
+          .then((text) =>
+            text ? bus.publish(runId, { type: 'message', role: 'ai', text }, 'decision.recorded') : undefined,
+          )
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err);
+            log.error({ runId, err: message }, 'recording the decision failed');
+            return bus.publish(
+              runId,
+              {
+                type: 'message',
+                role: 'ai',
+                text: `The decision is saved, but I could not record it in Confluence: ${message}`,
+              },
+              'decision.recorded',
+            );
+          });
+      }
     },
 
     /**
@@ -260,11 +288,11 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
             `The run is ${run.state}; documents can be published once the assessment is ready and until the decision`,
             409,
           );
-        await bus.publish(run.id, {
-          type: 'message',
-          role: 'client',
-          text: 'Generate the documents and publish them to Confluence',
-        });
+        await bus.publish(
+          run.id,
+          { type: 'message', role: 'client', text: 'Generate the documents and publish them to Confluence' },
+          'documents.request',
+        );
         await repo.resetFailures(run.id, 'documenting');
         await moveTo(run, 'documenting');
       });

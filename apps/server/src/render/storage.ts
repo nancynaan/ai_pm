@@ -152,3 +152,12 @@ export function storageToText(storage: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+/** The client deck's file name on the Feature Brief; the attachment and its embed use the same. */
+export const proposalFileName = (faNumber: number | null) =>
+  `${faNumber ? `FA-${faNumber} ` : ''}Feature Proposal.pptx`;
+
+/** Confluence's file preview of a page attachment (shows the PPTX inside the page). */
+export function viewFileMacro(fileName: string): string {
+  return `<ac:structured-macro ac:name="view-file" ac:schema-version="1"><ac:parameter ac:name="name"><ri:attachment ri:filename="${escape(fileName)}" /></ac:parameter><ac:parameter ac:name="height">250</ac:parameter></ac:structured-macro>`;
+}

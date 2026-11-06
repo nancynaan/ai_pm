@@ -156,7 +156,7 @@ describe('documents', () => {
     expect(docs[1]!.markdown).toContain('REQ-NFR-001');
     expect(docs[1]!.markdown).toContain('BR-01');
     expect(docs[3]!.markdown).toContain('FA3-R1'); // risk ids get the feature prefix on the shared register
-    expect(docs[4]!.markdown).toContain('Discovery: proceed');
+    expect(docs[4]!.markdown).toContain('Discovery: Continue with a preliminary assessment');
     // Text from agents can never act as a template slot.
     const injected = renderDocuments(
       inputsFor(a, { constraints: [{ type: 'other', text: 'Use {{figure:verdict}} here' }] }),

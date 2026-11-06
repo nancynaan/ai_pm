@@ -10,7 +10,7 @@ export const STATE_LABEL: Record<RunState, string> = {
   awaiting_documents: 'Waiting to publish documents',
   documenting: 'Writing documents',
   presenting: 'Preparing presentation',
-  awaiting_decision: 'Waiting for decision',
+  awaiting_decision: 'Waiting for your decision',
   backlog: 'Creating backlog',
   completed: 'Completed',
   declined: 'Declined',

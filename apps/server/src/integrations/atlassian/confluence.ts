@@ -22,6 +22,15 @@ export type ConfluencePage = z.infer<typeof pageSchema>;
 
 const pageListSchema = z.object({ results: z.array(pageSchema) });
 
+const attachmentSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  version: z.object({ number: z.number() }).optional(),
+  _links: z.object({ download: z.string().optional(), webui: z.string().optional() }).optional(),
+});
+export type ConfluenceAttachment = z.infer<typeof attachmentSchema>;
+const attachmentListSchema = z.object({ results: z.array(attachmentSchema) });
+
 export interface PageInput {
   spaceId: string;
   parentId?: string;
@@ -82,6 +91,34 @@ export function confluenceApi(http: AtlassianHttp) {
           },
         }),
       );
+    },
+
+    /** An attachment of a page by file name (v1; v2 has no upload endpoint). */
+    async findAttachment(pageId: string, fileName: string): Promise<ConfluenceAttachment | null> {
+      const list = attachmentListSchema.parse(
+        await http.get(`/wiki/rest/api/content/${pageId}/child/attachment`, { query: { filename: fileName } }),
+      );
+      return list.results[0] ?? null;
+    },
+
+    /** Uploads a new attachment, or a new version of an existing one. */
+    async uploadAttachment(
+      pageId: string,
+      fileName: string,
+      data: Uint8Array,
+      contentType: string,
+      existingId?: string,
+    ): Promise<ConfluenceAttachment> {
+      const form = new FormData();
+      form.append('file', new Blob([data], { type: contentType }), fileName);
+      form.append('minorEdit', 'true');
+      const path = existingId
+        ? `/wiki/rest/api/content/${pageId}/child/attachment/${existingId}/data`
+        : `/wiki/rest/api/content/${pageId}/child/attachment`;
+      const answer = await http.post<unknown>(path, { form });
+      // Create answers with a list, an update with the attachment itself.
+      const parsed = attachmentListSchema.safeParse(answer);
+      return parsed.success ? parsed.data.results[0]! : attachmentSchema.parse(answer);
     },
 
     /** v2 has no label endpoint for writes; adding an existing label is a no-op. */

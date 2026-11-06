@@ -25,6 +25,8 @@ export class ReadOnlyViolation extends Error {
 export interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
+  /** Multipart upload (Confluence attachments); sent as is, with the XSRF bypass header. */
+  form?: FormData;
 }
 
 export class AtlassianError extends Error {
@@ -52,7 +54,7 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
   const baseUrl = credentials.siteUrl.replace(/\/+$/, '');
   const authorization = `Basic ${Buffer.from(`${credentials.email}:${credentials.apiToken}`).toString('base64')}`;
 
-  async function request<T>(method: string, path: string, { query, body }: RequestOptions = {}): Promise<T> {
+  async function request<T>(method: string, path: string, { query, body, form }: RequestOptions = {}): Promise<T> {
     if (options.readOnly && method !== 'GET' && !(method === 'POST' && READ_ONLY_POSTS.has(path))) {
       throw new ReadOnlyViolation(`Blocked ${method} ${path}: Atlassian writes are in dry-run mode`);
     }
@@ -62,12 +64,13 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
     }
     const headers: Record<string, string> = { Authorization: authorization, Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (form) headers['X-Atlassian-Token'] = 'no-check';
 
     for (let attempt = 0; ; attempt++) {
       const response = await fetchImpl(url, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (response.ok) {

@@ -3,12 +3,17 @@
 // Claude call (plus repairs); the cached draft is ignored. Writes nothing to the database,
 // Jira or Confluence.
 //
-//   docker compose exec app node apps/server/dist/evals/writer-cli.js [--run <runId>]
+// With --presenter it runs the presenter instead and checks the three-slide deck the same way.
+//
+//   docker compose exec app node apps/server/dist/evals/writer-cli.js [--run <runId>] [--presenter]
 import type { RunEvent } from '@ai-pm/shared';
 import { desc } from 'drizzle-orm';
 import { loadAgentDefinitions } from '../agents/registry.js';
 import { type CallRecord, createAgentRunner } from '../agents/runner.js';
-import { AGENT_SCHEMAS, type DocumentDraft } from '../agents/schemas.js';
+import { AGENT_SCHEMAS, type DeckDraft, type DocumentDraft } from '../agents/schemas.js';
+import type { SeedData } from '../baseline/seed-data.js';
+import { buildDeck, presenterPrompt } from '../pipeline-engine/presentation/deck.js';
+import { checkDeckDraft, deckCheckContext } from '../pipeline-engine/presentation/validate.js';
 import { loadConfig } from '../config.js';
 import { createDb } from '../db/client.js';
 import { assessments } from '../db/schema.js';
@@ -80,6 +85,29 @@ async function main() {
       schemas: AGENT_SCHEMAS,
       defaultModel: config.claude.model,
     });
+
+    if (process.argv.includes('--presenter')) {
+      const data = await createContextBuilder({ db }).baselineData(run.projectId, ['business_case']);
+      const deckInputs = { ...inputs, kpis: (data.business_case as SeedData['kpis'] | undefined)?.metrics ?? [] };
+      const deckChecks = deckCheckContext(deckInputs);
+      console.log(`- ${inputs.featureName} (run ${run.id}): presenting…`);
+      const t0 = Date.now();
+      const deckDraft = await ask<DeckDraft>(ctx, 'presenter', presenterPrompt(deckInputs), {
+        check: (d) => checkDeckDraft(d, deckChecks),
+      });
+      const deck = buildDeck(deckInputs, deckDraft, '1.0', new Date());
+      const deckProblems = checkDeckDraft(deckDraft, deckChecks);
+      const deckTokens = calls.reduce((n, c) => n + (c.inputTokens ?? 0) + (c.outputTokens ?? 0), 0);
+      console.log(`  calls: ${calls.map((c) => c.status).join(' → ')} (${calls.length}; ${deckTokens.toLocaleString('en-US')} tokens; ${Math.round((Date.now() - t0) / 1000)} s)`);
+      for (const c of calls.filter((x) => x.status === 'invalid_output')) console.log(`  repaired: ${c.error}`);
+      console.log(`  1 ${deck.opportunity.heading}`);
+      console.log(`  2 ${deck.solution.heading} | flow: ${deck.solution.flow.join(' → ')}`);
+      console.log(`    capabilities: ${deck.solution.capabilities.map((c) => c.title).join(' · ')}`);
+      console.log(`  3 ${deck.feasibility.heading} | ${deck.feasibility.verdict.label}: ${deck.feasibility.verdict.sentence}`);
+      console.log(deckProblems.length ? `FAIL: ${deckProblems.join(' | ')}` : 'PASS: the deck check found nothing');
+      if (deckProblems.length) process.exitCode = 1;
+      return;
+    }
 
     console.log(`- ${inputs.featureName} (run ${run.id}): writing…`);
     const started = Date.now();

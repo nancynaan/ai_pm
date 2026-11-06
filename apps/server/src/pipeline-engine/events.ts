@@ -7,8 +7,9 @@ export function createEventBus(repo: Pick<RunRepository, 'addEvent'>) {
   const emitter = new EventEmitter();
   emitter.setMaxListeners(0);
   return {
-    async publish(runId: string, event: RunEvent): Promise<StoredRunEvent> {
-      const stored = await repo.addEvent(runId, event);
+    /** `key`: the step this event belongs to; a second event with the key replaces the first. */
+    async publish(runId: string, event: RunEvent, key?: string): Promise<StoredRunEvent> {
+      const stored = await repo.addEvent(runId, event, key);
       emitter.emit(runId, stored);
       return stored;
     },

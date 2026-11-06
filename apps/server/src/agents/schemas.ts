@@ -385,8 +385,48 @@ export const DocumentDraft = z.object({
 });
 export type DocumentDraft = z.infer<typeof DocumentDraft>;
 
+// ---- presenter (BPMN 05) ----------------------------------------------------------------------
+
+const short = (max: number, what: string) => z.string().min(3).max(max).describe(what);
+
+/** The wording of the three client slides; code fills in every number, range and chart. */
+export const DeckDraft = z.object({
+  opportunity: z.object({
+    heading: short(90, 'Conclusion-style heading: why this matters for the business, no numbers'),
+    objective: short(120, 'The primary business objective in one line'),
+    audience: short(80, 'Who benefits, in plain words'),
+  }),
+  solution: z.object({
+    heading: short(90, 'Conclusion-style heading: what the player gets'),
+    flow: z.array(short(40, 'One step of the player flow, a few words')).min(3).max(5),
+    capabilities: z
+      .array(
+        z.object({
+          title: short(40, 'A core capability, a few words'),
+          detail: short(90, 'One short line on what it does'),
+          requirementCodes: z.array(z.string().regex(/^REQ-(FR|NFR)-\d{3}$/)).min(1),
+        }),
+      )
+      .length(4),
+    boundary: short(120, 'The one scope boundary that matters most: what is not in this release'),
+  }),
+  feasibility: z.object({
+    heading: short(90, 'Conclusion-style heading on feasibility, consistent with the verdict'),
+    dependencies: z
+      .array(short(50, 'A key dependency: a system, integration or team, in a few words'))
+      .max(3)
+      .describe('Up to 3, blocking ones first; empty when there are none'),
+    recommendation: short(
+      260,
+      'The suggested verdict in one or two sentences, consistent with the rules’ verdict and its conditions',
+    ),
+  }),
+});
+export type DeckDraft = z.infer<typeof DeckDraft>;
+
 export const AGENT_SCHEMAS: Record<string, z.ZodType> = {
   DocumentDraft,
+  DeckDraft,
   EstimationResult,
   RiskAssessment,
   ValueAssessment,

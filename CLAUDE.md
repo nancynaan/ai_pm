@@ -50,4 +50,4 @@ Slash commands: `/rebuild` (build, restart, health), `/eval` (in-memory eval, de
 
 ## Status
 
-Phases 0–5 are done (Phase 5: documents in Confluence, published live for the demo run as FA-1). Next is Phase 6: presentation and decision. Writer-only eval (one Claude call): `node apps/server/dist/evals/writer-cli.js --run <id>`. History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).
+Phases 0–6 are done (Phase 6: three-slide client deck, PPTX on the Feature Brief, decision gate with the Decision Log; demo run deck v1.1 live). Next is Phase 7: backlog in Jira. One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer) and `… --presenter` (presenter). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).

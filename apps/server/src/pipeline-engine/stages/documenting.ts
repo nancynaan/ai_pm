@@ -51,11 +51,6 @@ export function documentingStage(services: StageServices & { documents: Document
     if (cached?.success && checkDraft(cached.data, checks).length === 0) {
       draft = cached.data;
     } else {
-      await ctx.emit({
-        type: 'message',
-        role: 'ai',
-        text: 'Writing the documents. This takes a few minutes.',
-      });
       draft = await services.ask<DocumentDraft>(ctx, 'pm-writer', prompt, {
         check: (d) => checkDraft(d, checks),
       });
@@ -85,22 +80,23 @@ export function documentingStage(services: StageServices & { documents: Document
     await docs.repo.saveDocuments(run.id, rows, docs.publisher.mode);
 
     const published = results.filter((r) => PUBLISHED.has(r.status)).length;
-    await ctx.emit({ type: 'documents', published, mode: docs.publisher.mode });
+    // Each step shows once in the chat: a re-publish rewrites these in place.
+    await ctx.emit({ type: 'documents', published, mode: docs.publisher.mode }, 'documents.status');
     const live = docs.publisher.mode === 'live';
-    await ctx.emit({
-      type: 'message',
-      role: 'ai',
-      text: live
-        ? `The documents are in Confluence (FA-${set.faNumber}): ${published} published. The Documents card above has the links.`
-        : `Confluence writes are in dry-run mode, so nothing was written. The Documents card above shows what a live publish would do; each document has a preview.`,
-    });
+    await ctx.emit(
+      {
+        type: 'message',
+        role: 'ai',
+        text: live
+          ? `The documents are in Confluence (FA-${set.faNumber}): ${published} published. The Documents card above has the links.`
+          : `Confluence writes are in dry-run mode, so nothing was written. The Documents card above shows what a live publish would do; each document has a preview.`,
+      },
+      'documents.result',
+    );
 
-    // A re-publish from the decision step returns there; the first publish goes on to the presentation.
-    const [presented, estimated] = await Promise.all([
-      ctx.repo.lastSucceededAt(run.id, 'presenting'),
-      ctx.repo.lastSucceededAt(run.id, 'estimating'),
-    ]);
-    const next = presented && estimated && presented > estimated ? 'awaiting_decision' : 'presenting';
+    // Always on to the presentation: it reuses an unchanged deck (no Claude call, no new cards)
+    // and keeps the deck and its PPTX in Confluence in step with the documents.
+    const next = 'presenting';
     return {
       next,
       output: {

@@ -232,12 +232,15 @@ export function estimatingStage(services: StageServices): StageHandler {
     await services.analysis.saveAssessment(assessment);
 
     const points = highlights(assessment);
-    await ctx.emit({
-      type: 'assessment_ready',
-      decision: assessment.verdict.decision,
-      label: assessment.verdict.label,
-      highlights: points,
-    });
+    await ctx.emit(
+      {
+        type: 'assessment_ready',
+        decision: assessment.verdict.decision,
+        label: assessment.verdict.label,
+        highlights: points,
+      },
+      'assessment',
+    );
     return {
       // The client publishes the documents with the button on the Documents card.
       next: 'awaiting_documents',

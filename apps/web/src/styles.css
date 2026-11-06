@@ -1138,3 +1138,408 @@ table.risks td {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+/* ---- Client deck (stage 05): a fixed client-deliverable palette, the same in light and dark ---- */
+
+.deck-viewer {
+  margin-top: 16px;
+}
+
+.slide {
+  --d-bg: #0e1a2b;
+  --d-panel: #16263d;
+  --d-line: #24395a;
+  --d-text: #f2f5fa;
+  --d-muted: #93a3bc;
+  --d-coin: #f5b83d;
+  --d-lane: #35c9b8;
+  --d-high: #e5644e;
+  container-type: inline-size;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  padding: 3.2cqw 4.5cqw 5.2cqw;
+  background: var(--d-bg);
+  color: var(--d-text);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 1.25cqw;
+  line-height: 1.35;
+}
+
+.slide .pixels {
+  position: absolute;
+  top: 3cqw;
+  right: 4.5cqw;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6cqw;
+}
+
+.slide .pixels i {
+  display: block;
+  width: 0.9cqw;
+  height: 0.9cqw;
+  background: var(--d-line);
+}
+
+.slide .pixels i:nth-child(2) {
+  width: 1.1cqw;
+  height: 1.1cqw;
+}
+
+.slide .pixels i:nth-child(3) {
+  width: 1.3cqw;
+  height: 1.3cqw;
+  background: var(--d-coin);
+}
+
+.slide .kicker {
+  margin: 0;
+  color: var(--d-coin);
+  font-weight: 700;
+  font-size: 1.05cqw;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.slide h2 {
+  margin: 0.6cqw 0 1.8cqw;
+  font-size: 2.6cqw;
+  line-height: 1.2;
+  max-width: 85%;
+}
+
+.slide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqw;
+  min-height: 0;
+}
+
+.slide footer {
+  position: absolute;
+  left: 4.5cqw;
+  right: 4.5cqw;
+  bottom: 1.4cqw;
+  display: flex;
+  justify-content: space-between;
+  gap: 2cqw;
+  padding-top: 0.8cqw;
+  border-top: 0.15cqw dashed var(--d-lane);
+  color: var(--d-muted);
+  font-size: 0.95cqw;
+}
+
+.slide .panel {
+  position: relative;
+  padding: 1.4cqw 1.8cqw 1.4cqw 2.2cqw;
+  background: var(--d-panel);
+  border: 1px solid var(--d-line);
+  border-radius: 0.8cqw;
+}
+
+.slide .panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 1cqw;
+  bottom: 1cqw;
+  width: 0.45cqw;
+  background: var(--d-line);
+}
+
+.slide .panel.coin::before {
+  background: var(--d-coin);
+}
+
+.slide .panel.lane::before {
+  background: var(--d-lane);
+}
+
+.slide .panel.risk::before {
+  background: var(--d-high);
+}
+
+.slide small {
+  display: block;
+  color: var(--d-muted);
+  font-size: 1cqw;
+  font-weight: 400;
+}
+
+.slide .two-col {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 1.8cqw;
+  flex: 1;
+}
+
+.slide dl {
+  margin: 0;
+}
+
+.slide dt {
+  color: var(--d-muted);
+  font-size: 0.9cqw;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.slide dd {
+  margin: 0.2cqw 0 1.1cqw;
+  font-size: 1.45cqw;
+  font-weight: 700;
+}
+
+.slide .kpi-chart {
+  margin: 0;
+  height: 80%;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide .kpi-chart figcaption {
+  color: var(--d-muted);
+  font-weight: 700;
+  font-size: 1.05cqw;
+}
+
+.slide .bars {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.6cqw;
+  align-items: end;
+  padding-top: 2cqw;
+}
+
+.slide .bar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4cqw;
+}
+
+.slide .bar .fill {
+  width: 100%;
+  background: var(--d-lane);
+  border-radius: 0.5cqw 0.5cqw 0 0;
+}
+
+.slide .bar.today .fill {
+  background: var(--d-muted);
+}
+
+.slide .bar .value {
+  font-weight: 700;
+  font-size: 1.15cqw;
+}
+
+.slide .bar .label {
+  color: var(--d-muted);
+  font-size: 1cqw;
+}
+
+.slide .caution {
+  margin: 1cqw 0 0;
+  color: var(--d-coin);
+  font-size: 1.05cqw;
+}
+
+.slide .flow {
+  list-style: none;
+  margin: 0.4cqw 0 0;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+}
+
+.slide .flow::before {
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 1.5cqw;
+  border-top: 0.25cqw dashed var(--d-lane);
+}
+
+.slide .flow li {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6cqw;
+  text-align: center;
+}
+
+.slide .flow .dot {
+  display: grid;
+  place-items: center;
+  width: 3cqw;
+  height: 3cqw;
+  border-radius: 50%;
+  border: 0.25cqw solid var(--d-lane);
+  background: var(--d-bg);
+  color: var(--d-lane);
+  font-weight: 700;
+}
+
+.slide .flow .goal .dot {
+  background: var(--d-coin);
+  border-color: var(--d-coin);
+  color: var(--d-bg);
+}
+
+.slide .flow .step {
+  font-size: 1.3cqw;
+  max-width: 14cqw;
+}
+
+.slide .capabilities {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.2cqw;
+}
+
+.slide .capabilities strong {
+  display: block;
+  font-size: 1.35cqw;
+  margin-bottom: 0.4cqw;
+}
+
+.slide .capabilities span {
+  color: var(--d-muted);
+  font-size: 1.1cqw;
+}
+
+.slide .hud {
+  display: flex;
+  gap: 1.2cqw;
+}
+
+.slide .hud div {
+  flex: 1;
+  padding: 0.8cqw;
+  border: 1px solid var(--d-line);
+  border-radius: 0.6cqw;
+  text-align: center;
+}
+
+.slide .hud b {
+  display: block;
+  color: var(--d-coin);
+  font-size: 2.3cqw;
+  line-height: 1.1;
+}
+
+.slide .hud span {
+  color: var(--d-muted);
+  font-size: 1cqw;
+}
+
+.slide .boundary {
+  margin: 0;
+  color: var(--d-muted);
+  font-style: italic;
+}
+
+.slide .tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2cqw;
+  flex: 1;
+}
+
+.slide .tiles h3 {
+  margin: 0 0 0.5cqw;
+  color: var(--d-muted);
+  font-size: 0.9cqw;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.slide .tiles b {
+  display: block;
+  font-size: 1.9cqw;
+  margin-bottom: 0.3cqw;
+}
+
+.slide .tiles ul {
+  margin: 0.4cqw 0 0;
+  padding-left: 1.4cqw;
+}
+
+.slide .tiles li {
+  margin-bottom: 0.3cqw;
+}
+
+.slide .tiles li em {
+  color: var(--d-muted);
+  font-style: normal;
+}
+
+.slide .tiles li.high::marker {
+  color: var(--d-high);
+}
+
+.slide .tiles li.medium::marker {
+  color: var(--d-coin);
+}
+
+.slide .tiles li.low::marker,
+.slide .deps li::marker {
+  color: var(--d-lane);
+}
+
+.slide .verdict {
+  display: flex;
+  align-items: center;
+  gap: 1.6cqw;
+  padding: 1cqw 1.4cqw;
+  border: 0.15cqw solid var(--d-coin);
+  border-radius: 0.8cqw;
+  background: var(--d-panel);
+}
+
+.slide .verdict.go {
+  border-color: var(--d-lane);
+}
+
+.slide .verdict.no_go {
+  border-color: var(--d-high);
+}
+
+.slide .verdict .badge {
+  flex: none;
+  padding: 0.6cqw 1.2cqw;
+  border-radius: 0.5cqw;
+  background: var(--d-coin);
+  color: var(--d-bg);
+  font-weight: 700;
+}
+
+.slide .verdict.go .badge {
+  background: var(--d-lane);
+}
+
+.slide .verdict.no_go .badge {
+  background: var(--d-high);
+}
+
+.slide .verdict p {
+  margin: 0;
+  font-size: 1.3cqw;
+}
+
+.deck-nav {
+  justify-content: center;
+}

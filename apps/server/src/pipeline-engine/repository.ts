@@ -133,10 +133,24 @@ export function createRunRepository(db: Db) {
         .where(eq(pipelineRuns.id, runId));
     },
 
-    async addEvent(runId: string, event: RunEvent): Promise<StoredRunEvent> {
+    /** With a key, an earlier event of the same step is rewritten in place (same id, same position). */
+    async addEvent(runId: string, event: RunEvent, key?: string): Promise<StoredRunEvent> {
       const { type, ...payload } = event;
-      const [row] = await db.insert(runEvents).values({ runId, type, payload }).returning();
-      return { id: row!.id, createdAt: row!.createdAt.toISOString(), event };
+      if (key) {
+        const [existing] = await db
+          .select({ id: runEvents.id, createdAt: runEvents.createdAt })
+          .from(runEvents)
+          .where(and(eq(runEvents.runId, runId), eq(runEvents.key, key)));
+        if (existing) {
+          await db.update(runEvents).set({ type, payload }).where(eq(runEvents.id, existing.id));
+          return { id: existing.id, createdAt: existing.createdAt.toISOString(), event, replaced: true, key };
+        }
+      }
+      const [row] = await db
+        .insert(runEvents)
+        .values({ runId, type, payload, key: key ?? null })
+        .returning();
+      return { id: row!.id, createdAt: row!.createdAt.toISOString(), event, ...(key ? { key } : {}) };
     },
 
     async listEvents(runId: string, afterId = 0): Promise<StoredRunEvent[]> {
@@ -149,6 +163,7 @@ export function createRunRepository(db: Db) {
         id: r.id,
         createdAt: r.createdAt.toISOString(),
         event: runEventSchema.parse({ type: r.type, ...r.payload }),
+        ...(r.key ? { key: r.key } : {}),
       }));
     },
 

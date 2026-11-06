@@ -131,6 +131,14 @@ const KIND: Record<string, string> = {
   value: 'Value assumption',
 };
 
+const DECISION_LABEL: Record<string, string> = {
+  approve: 'Approved',
+  changes: 'Changes requested',
+  decline: 'Declined',
+  proceed: 'Continue with a preliminary assessment',
+  stop: 'Stopped',
+};
+
 const riskStatement = (r: AssessedRisk) => `${safe(r.cause)} → ${safe(r.event)} → ${safe(r.effect)}`;
 
 export interface TableContext {
@@ -376,18 +384,19 @@ export function tables({ inputs, figures, links }: TableContext): Record<string,
 
     // ---- Roadmap Update Proposal
     roadmap: () => {
-      const rows: { release: string; window: string; status: string; change: string }[] = inputs.baseline.roadmap.releases.map((r) => {
-        const affected =
-          a.roadmapImpact.release === `${r.id} ${r.name}` || a.roadmapImpact.release === r.name;
-        return {
-          release: `${r.id} ${r.name}`,
-          window: r.window,
-          status: r.status,
-          change: affected
-            ? `Done by ${figures['roadmap.finish_with']} instead of ${figures['roadmap.finish_without']} (${figures['roadmap.delay']} later)`
-            : 'No change',
-        };
-      });
+      const rows: { release: string; window: string; status: string; change: string }[] =
+        inputs.baseline.roadmap.releases.map((r) => {
+          const affected =
+            a.roadmapImpact.release === `${r.id} ${r.name}` || a.roadmapImpact.release === r.name;
+          return {
+            release: `${r.id} ${r.name}`,
+            window: r.window,
+            status: r.status,
+            change: affected
+              ? `Done by ${figures['roadmap.finish_with']} instead of ${figures['roadmap.finish_without']} (${figures['roadmap.delay']} later)`
+              : 'No change',
+          };
+        });
       rows.push({
         release: `${figures.fa} ${inputs.featureName} (new)`,
         window: `MVP by ${figures['forecast.mvp.date.p85']}, full scope by ${figures['forecast.full.date.p85']} (P85)`,
@@ -460,7 +469,7 @@ export function tables({ inputs, figures, links }: TableContext): Record<string,
       const rows = [
         ...inputs.decisions.map((d) => ({
           when: formatDate(d.decidedAt.slice(0, 10)),
-          what: `${d.gate === 'discovery' ? 'Discovery' : 'Assessment'}: ${d.decision}`,
+          what: `${d.gate === 'discovery' ? 'Discovery' : 'Client decision'}: ${DECISION_LABEL[d.decision] ?? d.decision}`,
           note: d.comment ?? '',
         })),
         ...(inputs.report?.contradictions ?? [])
@@ -469,7 +478,9 @@ export function tables({ inputs, figures, links }: TableContext): Record<string,
         {
           when: formatDate(a.createdAt.slice(0, 10)),
           what: `Recommendation: ${a.verdict.label}${a.preliminary ? ' (preliminary)' : ''}`,
-          note: 'Awaiting the client decision',
+          note: inputs.decisions.some((d) => d.gate === 'assessment')
+            ? 'Decided by the client (see the decision above)'
+            : 'Awaiting the client decision',
         },
       ];
       return markdownTable(rows, [

@@ -30,7 +30,13 @@ describe('state machine', () => {
 });
 
 /** In-memory stand-ins for Postgres, the advisory lock and pg-boss. */
-function setupEngine(handlers: StageHandlers, options: { lockFree?: () => boolean } = {}) {
+function setupEngine(
+  handlers: StageHandlers,
+  options: {
+    lockFree?: () => boolean;
+    onDecision?: (run: RunRecord, decision: 'approve' | 'changes' | 'decline') => Promise<string | null>;
+  } = {},
+) {
   const runs = new Map<string, RunRecord>();
   const executions: { runId: string; stage: RunState; status: string }[] = [];
   const questionnaires: (Questionnaire & { runId: string; answers?: Record<string, string[]> })[] = [];
@@ -132,6 +138,7 @@ function setupEngine(handlers: StageHandlers, options: { lockFree?: () => boolea
     handlers,
     log,
     retryDelaySeconds: 5,
+    ...(options.onDecision ? { onDecision: options.onDecision } : {}),
   });
   /** Runs queued jobs like the worker would, until none are left. */
   async function drain() {
@@ -189,6 +196,45 @@ describe('pipeline engine', () => {
       'backlog',
       'completed',
     ]);
+  });
+
+  it('moves each decision to the right state and records it through the decision hook', async () => {
+    const recorded: string[] = [];
+    const h = setupEngine(
+      {},
+      {
+        onDecision: async (_run, decision) => {
+          recorded.push(decision);
+          return decision === 'decline' ? null : `Recorded: ${decision}`;
+        },
+      },
+    );
+    const expected = { approve: 'backlog', changes: 'analyzing', decline: 'declined' } as const;
+    for (const decision of ['approve', 'changes', 'decline'] as const) {
+      const run = await h.pipelineEngine.createRun(`A feature to ${decision}`);
+      h.runs.get(run.id)!.state = 'awaiting_decision';
+      await h.pipelineEngine.decide(run.id, { decision });
+      expect(h.runs.get(run.id)!.state).toBe(expected[decision]);
+      await expect(h.pipelineEngine.decide(run.id, { decision })).rejects.toThrow(
+        /not waiting for a decision/,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the hook runs after the action
+    expect(recorded).toEqual(['approve', 'changes', 'decline']);
+    const texts = h.events.flatMap((e) => (e.type === 'message' && e.role === 'ai' ? [e.text] : []));
+    expect(texts).toEqual(['Recorded: approve', 'Recorded: changes']);
+  });
+
+  it('goes straight to the backlog with auto-approve on', async () => {
+    const h = setupEngine({
+      ...placeholderStages({ delayMs: 0, autoApprove: true }),
+      documenting: async () => ({ next: 'presenting' }),
+    });
+    const run = await h.pipelineEngine.createRun('Auto-approved feature');
+    h.runs.get(run.id)!.state = 'awaiting_documents';
+    await h.pipelineEngine.publishDocuments(run.id);
+    await h.drain();
+    expect(h.runs.get(run.id)!.state).toBe('completed');
   });
 
   it('publishes documents only after the assessment and until the decision, and re-publishes from the decision', async () => {

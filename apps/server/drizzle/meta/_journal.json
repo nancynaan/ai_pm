@@ -50,6 +50,20 @@
       "when": 1793974034454,
       "tag": "0006_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793985340709,
+      "tag": "0007_presentations",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793991061824,
+      "tag": "0008_event_keys",
+      "breakpoints": true
     }
   ]
 }

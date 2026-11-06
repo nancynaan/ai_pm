@@ -3,6 +3,7 @@ import {
   DOCUMENT_LABEL,
   DOCUMENT_TYPES,
   type DocumentSet,
+  type Presentation,
   documentTypeSchema,
   createRunSchema,
   decisionSchema,
@@ -14,6 +15,9 @@ import { z } from 'zod';
 import type { AnalysisRepository } from '../pipeline-engine/analysis-repository.js';
 import { needsRoadmapProposal } from '../pipeline-engine/calculators/baseline.js';
 import type { DocumentRepository } from '../pipeline-engine/documents/repository.js';
+import type { PresentationRepository } from '../pipeline-engine/presentation/repository.js';
+import { PPTX_TYPE } from '../pipeline-engine/stages/presenting.js';
+import { deckFileName, deckToPptx } from '../render/pptx.js';
 import type { EventBus } from '../pipeline-engine/events.js';
 import { type PipelineEngine, RunActionError } from '../pipeline-engine/engine.js';
 import type { RunRepository } from '../pipeline-engine/repository.js';
@@ -26,6 +30,8 @@ export interface RunRouteDeps {
   assessments?: Pick<AnalysisRepository, 'assessmentOf' | 'listAssessments'>;
   /** The PM documents (stage 04) and the current Confluence write mode. */
   documents?: { repo: Pick<DocumentRepository, 'setOf' | 'documentsOf'>; mode: 'dry-run' | 'live' };
+  /** The client deck (stage 05). */
+  presentations?: Pick<PresentationRepository, 'get'>;
 }
 
 const docParams = z.object({ id: z.uuid(), type: documentTypeSchema });
@@ -141,6 +147,43 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
     }),
   );
 
+  /** The slide viewer: the deck and where its PPTX is attached. */
+  app.get('/api/runs/:id/presentation', async (request, reply) =>
+    handle(reply, async (): Promise<Presentation> => {
+      const { id } = idParams.parse(request.params);
+      const stored = await deps.presentations?.get(id);
+      if (!stored) throw new RunActionError('This run has no presentation yet', 404);
+      const set = await deps.documents?.repo.setOf(id);
+      return {
+        deck: stored.deck,
+        attachment: stored.attachmentStatus
+          ? {
+              status: stored.attachmentStatus,
+              url: stored.attachmentUrl,
+              fileName: deckFileName(stored.deck, set?.faNumber ?? null),
+            }
+          : null,
+      };
+    }),
+  );
+
+  app.get('/api/runs/:id/presentation.pptx', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      const stored = await deps.presentations?.get(id);
+      if (!stored) throw new RunActionError('This run has no presentation yet', 404);
+      const set = await deps.documents?.repo.setOf(id);
+      const file = await deckToPptx(stored.deck);
+      return reply
+        .header('Content-Type', PPTX_TYPE)
+        .header(
+          'Content-Disposition',
+          `attachment; filename="${deckFileName(stored.deck, set?.faNumber ?? null)}"`,
+        )
+        .send(file);
+    }),
+  );
+
   app.post('/api/runs/:id/answers', async (request, reply) =>
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
@@ -197,9 +240,10 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
     let replaying = true;
     const buffered: StoredRunEvent[] = [];
     const send = (event: StoredRunEvent) => {
-      if (event.id <= sentUpTo) return;
+      // A replaced block keeps its old id; send it anyway so the chat updates it in place.
+      if (event.id <= sentUpTo && !event.replaced) return;
       res.write(`id: ${event.id}\nevent: run\ndata: ${JSON.stringify(event)}\n\n`);
-      sentUpTo = event.id;
+      sentUpTo = Math.max(sentUpTo, event.id);
     };
     const unsubscribe = bus.subscribe(id, (event) => (replaying ? buffered.push(event) : send(event)));
     const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 15_000);

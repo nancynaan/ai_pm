@@ -124,6 +124,7 @@ describe('the real agents and skills', () => {
       'estimator',
       'impact-analyst',
       'pm-writer',
+      'presenter',
       'requirements-analyst',
       'risk-analyst',
       'value-analyst',

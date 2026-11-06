@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnalysisList, AnalysisView } from './Analysis.js';
 import { ChatHome } from './ChatHome.js';
 import { DocumentPreview } from './Documents.js';
+import { PresentationView } from './Presentation.js';
 import { RunView } from './RunView.js';
 import { StatusPage } from './StatusPage.js';
 
@@ -9,6 +10,7 @@ type Route =
   | { page: 'chat' }
   | { page: 'run'; runId: string }
   | { page: 'document'; runId: string; type: string }
+  | { page: 'presentation'; runId: string }
   | { page: 'analysis' }
   | { page: 'assessment'; runId: string }
   | { page: 'status' };
@@ -18,6 +20,8 @@ const UUID = '([0-9a-f-]{36})';
 function parseHash(hash: string): Route {
   const doc = new RegExp(`^#/runs/${UUID}/documents/([a-z_]+)$`, 'i').exec(hash);
   if (doc?.[1] && doc[2]) return { page: 'document', runId: doc[1], type: doc[2] };
+  const deck = new RegExp(`^#/runs/${UUID}/presentation$`, 'i').exec(hash);
+  if (deck?.[1]) return { page: 'presentation', runId: deck[1] };
   const run = new RegExp(`^#/runs/${UUID}$`, 'i').exec(hash);
   if (run?.[1]) return { page: 'run', runId: run[1] };
   const assessment = new RegExp(`^#/analysis/${UUID}$`, 'i').exec(hash);
@@ -49,7 +53,7 @@ export function App() {
       : route.page === 'status'
         ? 'status'
         : 'chat';
-  const wide = route.page === 'assessment' || route.page === 'document';
+  const wide = route.page === 'assessment' || route.page === 'document' || route.page === 'presentation';
 
   return (
     <main className={wide ? 'wide' : undefined}>
@@ -72,6 +76,7 @@ export function App() {
 
       {route.page === 'chat' && <ChatHome />}
       {route.page === 'run' && <RunView key={route.runId} runId={route.runId} />}
+      {route.page === 'presentation' && <PresentationView key={route.runId} runId={route.runId} />}
       {route.page === 'document' && (
         <DocumentPreview key={route.type} runId={route.runId} type={route.type} />
       )}
