@@ -1,7 +1,8 @@
 :root {
-  /* Warm ivory surfaces and deep slate ink on a sand-to-slate gradient. */
-  --page-from: #decba4;
-  --page-to: #3e5151;
+  /* Warm ivory surfaces and deep slate ink on a blush page with soft blue ripples. */
+  --page-base: #fcf6f5;
+  --page-ripple-from: #7b9acc55;
+  --page-ripple-to: #7b9acc;
   --bg: #ebe5da; /* inset wells: inputs, code, inner panels */
   --surface: #f8f5ef;
   --surface-glass: rgba(248, 245, 239, 0.9);
@@ -25,11 +26,10 @@
   --press: inset 3px 3px 7px rgba(28, 40, 40, 0.14), inset -3px -3px 7px rgba(255, 255, 255, 0.75);
   /* The navigation bar: the darkest surface, in both modes. */
   --nav-bg: #30231c; /* dark chocolate */
-  /* The bar over scrolling content: nav-bg at 90 % (tab text stays >= 5.2:1 over ivory). */
-  --nav-glass: rgba(48, 35, 28, 0.9);
+  --nav-glass: #1e2929;
   --nav-text: #f4eee7;
-  --nav-muted: #c8bbae;
-  --nav-active: #8fb4e3; /* the client-bubble blue, lighter */
+  --nav-muted: #dadada;
+  --nav-active: #8cbfff;
   /* Actions: go ahead (publish, approve) and stop (decline). White text >= 4.5:1. */
   --go-bg: #23864e;
   --go-bg-hover: #1e7543;
@@ -302,6 +302,9 @@ header.top {
 
 header.top h1 a {
   text-decoration: none;
+  border: 2px solid var(--nav-text);
+  padding: 0 5px;
+  border-radius: 5px;
 }
 
 nav {
@@ -1728,9 +1731,10 @@ table.risks td {
 
 body {
   min-height: 100vh;
-  background: var(--page-to); /* fallback for old browsers */
-  background: -webkit-linear-gradient(to right, var(--page-from), var(--page-to));
-  background: linear-gradient(to right, var(--page-from), var(--page-to));
+  background-color: var(--page-base);
+  background-image:
+    repeating-radial-gradient(circle at 0 0, transparent 0, var(--page-base) 30px),
+    repeating-linear-gradient(var(--page-ripple-from), var(--page-ripple-to));
   background-attachment: fixed;
 }
 

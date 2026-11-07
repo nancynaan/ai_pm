@@ -70,7 +70,7 @@ Updated 2026-11-07. Read this before starting work in a new chat.
 - **Decision gate:** the question ("Here is the assessment summary…") comes before the decision card; `onDecision` writes the decision to the Brief and the Assumption Log block; a decline closes the draft Epic.
 - **Chat:** exactly one block per step. Step events carry a key and a re-run rewrites them in place (see the pipeline engine's `CLAUDE.md`). The Documents card sits under the client's request.
 - **Feature names:** the elicitation agent returns a short `title` (4–9 words, verb first) that intake saves as the feature's name; the Epic and Confluence pages keep `epicSummary`.
-- **UI:** home page with only System status; feature screens with Chat / Analysis / Documents / Presentation tabs; gradient theme with light neumorphism; pinned chocolate navigation bar. Details in `apps/web/CLAUDE.md`.
+- **UI:** home page with only System status; feature screens with Chat / Analysis / Documents / Presentation tabs; rippled blush background with light neumorphism; pinned dark slate navigation bar. Details in `apps/web/CLAUDE.md`.
 - **Evals:** the user wants Claude calls kept low. Prefer one-agent evals (`writer-cli.js --run <id>`, `… --presenter`, one call each) over the full `/eval` (about 8 calls). A record/replay cache for the full eval was proposed but not built.
 
 ### Decisions made in Phase 7
