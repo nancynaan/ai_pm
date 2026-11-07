@@ -123,6 +123,17 @@ export function DocumentsCard({ runId, version }: { runId: string; version: numb
       <p className="actions">
         {set.running ? (
           <span className="muted">Writing and publishing the documents… this takes a few minutes.</span>
+        ) : set.lockedReason ? (
+          // Locked after the decision: aria-disabled keeps it focusable, so the hint shows on hover,
+          // keyboard focus and a tap, while a click does nothing.
+          <span className="hint-wrap">
+            <button type="button" className="go" aria-disabled="true" aria-describedby="publish-hint">
+              {published ? 'Publish again (rewrites the same pages)' : 'Generate and publish to Confluence'}
+            </button>
+            <span role="tooltip" id="publish-hint" className="hint">
+              {set.lockedReason}
+            </span>
+          </span>
         ) : (
           <button
             type="button"

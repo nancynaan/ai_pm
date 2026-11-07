@@ -130,6 +130,64 @@ button:disabled {
   cursor: default;
 }
 
+/* Locked for good (e.g. documents after the decision): looks disabled, still shows its hint. */
+button[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* A short hint above a control, on hover, keyboard focus or tap. */
+.hint-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.hint {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: max-content;
+  max-width: min(300px, 80vw);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--nav-glass);
+  color: var(--nav-text);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: var(--raise-sm);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.hint::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 24px;
+  border: 6px solid transparent;
+  border-top-color: var(--nav-glass);
+}
+
+.hint-wrap:hover .hint,
+.hint-wrap:focus-within .hint {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint {
+    transition: none;
+  }
+}
+
 table {
   width: 100%;
   margin-top: 16px;
@@ -1143,6 +1201,65 @@ table.risks td {
   overflow-x: auto;
 }
 
+/*
+ * Wide Analysis tables (release forecast, resources, business value). On phones they scroll
+ * sideways inside the card with the first column pinned; a soft shade on the right edge shows
+ * there is more, and it disappears at the end. Desktop is unchanged.
+ */
+@media (max-width: 640px) {
+  .table-wide {
+    margin-top: 16px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    background:
+      linear-gradient(to left, var(--surface) 45%, transparent) right / 28px 100% no-repeat local,
+      linear-gradient(to left, color-mix(in srgb, var(--muted) 22%, transparent), transparent) right / 14px
+        100% no-repeat scroll;
+  }
+
+  .table-wide::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .table-wide::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+  }
+
+  .table-wide table {
+    margin-top: 0;
+    width: max-content;
+    min-width: 100%;
+    /* Separate borders move with the pinned cells; collapsed ones stay behind. */
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  /* Headings, numbers and the pinned labels stay on one line; prose cells wrap at a readable width. */
+  .table-wide th,
+  .table-wide .num,
+  .table-wide td:first-child {
+    white-space: nowrap;
+  }
+
+  .table-wide td:not(:first-child):not(.num) {
+    min-width: 200px;
+    max-width: 240px;
+  }
+
+  .table-wide th:first-child,
+  .table-wide td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    padding-left: 0;
+    background: var(--surface);
+    box-shadow: inset -1px 0 0 var(--border);
+  }
+}
+
 .documents td.links {
   display: flex;
   flex-wrap: wrap;
@@ -1651,7 +1768,7 @@ a.button {
   transition: box-shadow 0.15s ease;
 }
 
-button:not(:disabled):active,
+button:not(:disabled):not([aria-disabled='true']):active,
 a.button:active {
   box-shadow: var(--press);
 }
@@ -1751,7 +1868,7 @@ button.go {
   background: var(--go-bg);
 }
 
-button.go:not(:disabled):hover {
+button.go:not(:disabled):not([aria-disabled='true']):hover {
   background: var(--go-bg-hover);
 }
 

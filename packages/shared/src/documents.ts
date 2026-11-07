@@ -63,6 +63,8 @@ export const documentSetSchema = z.object({
   publishedAt: z.string().nullable(),
   /** The button is active: the run waits for documents or for the client's decision. */
   canPublish: z.boolean(),
+  /** Why the button is locked for good (the client already decided); shown as a hint. */
+  lockedReason: z.string().nullable(),
   /** The documents step is running now. */
   running: z.boolean(),
   documents: z.array(documentRowSchema),

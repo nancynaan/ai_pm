@@ -262,37 +262,39 @@ export function AnalysisView({ runId }: { runId: string }) {
             dateOf={dateOfSprints}
           />
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Slice</th>
-              <th className="num">Points P50 / P85</th>
-              <th className="num">Sprints P50 / P85 / P95</th>
-              <th className="num">Done by P50</th>
-              <th className="num">P85</th>
-              <th className="num">P95</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(['mvp', 'full'] as const).map((k) => {
-              const f = a.forecast[k];
-              return (
-                <tr key={k}>
-                  <td>{k === 'mvp' ? 'MVP' : 'Full scope'}</td>
-                  <td className="num">
-                    {f.points.p50} / {f.points.p85}
-                  </td>
-                  <td className="num">
-                    {f.sprints.p50} / {f.sprints.p85} / {f.sprints.p95}
-                  </td>
-                  <td className="num">{date(f.dates.p50)}</td>
-                  <td className="num">{date(f.dates.p85)}</td>
-                  <td className="num">{date(f.dates.p95)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="table-wide">
+          <table>
+            <thead>
+              <tr>
+                <th>Slice</th>
+                <th className="num">Points P50 / P85</th>
+                <th className="num">Sprints P50 / P85 / P95</th>
+                <th className="num">Done by P50</th>
+                <th className="num">P85</th>
+                <th className="num">P95</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(['mvp', 'full'] as const).map((k) => {
+                const f = a.forecast[k];
+                return (
+                  <tr key={k}>
+                    <td>{k === 'mvp' ? 'MVP' : 'Full scope'}</td>
+                    <td className="num">
+                      {f.points.p50} / {f.points.p85}
+                    </td>
+                    <td className="num">
+                      {f.sprints.p50} / {f.sprints.p85} / {f.sprints.p95}
+                    </td>
+                    <td className="num">{date(f.dates.p50)}</td>
+                    <td className="num">{date(f.dates.p85)}</td>
+                    <td className="num">{date(f.dates.p95)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         {a.roadmapImpact.release && (
           <p className={a.roadmapImpact.launchAtRisk ? 'banner warn' : 'muted'}>
             <strong>Roadmap impact:</strong> {a.roadmapImpact.release} has {a.roadmapImpact.remainingPoints}{' '}
@@ -321,39 +323,41 @@ export function AnalysisView({ runId }: { runId: string }) {
 
       <section className="card">
         <h3>Resources</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Discipline</th>
-              <th className="num">Share of points</th>
-              <th className="num">Needs (FTE)</th>
-              <th className="num">Has (FTE)</th>
-              <th className="num">Own work (sprints)</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {a.resources.map((r) => (
-              <tr key={r.discipline}>
-                <td>{DISCIPLINE[r.discipline]}</td>
-                <td className="num">{pct(r.pointsShare)}</td>
-                <td className="num">{r.demandFte}</td>
-                <td className="num">{r.availableFte}</td>
-                <td className="num">{r.sprintsNeeded ?? '–'}</td>
-                <td>
-                  {r.bottleneck && (
-                    <span
-                      className="tag neutral"
-                      title="Its own work takes longest; the forecast already uses its pace"
-                    >
-                      sets the pace
-                    </span>
-                  )}
-                </td>
+        <div className="table-wide">
+          <table>
+            <thead>
+              <tr>
+                <th>Discipline</th>
+                <th className="num">Share of points</th>
+                <th className="num">Needs (FTE)</th>
+                <th className="num">Has (FTE)</th>
+                <th className="num">Own work (sprints)</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {a.resources.map((r) => (
+                <tr key={r.discipline}>
+                  <td>{DISCIPLINE[r.discipline]}</td>
+                  <td className="num">{pct(r.pointsShare)}</td>
+                  <td className="num">{r.demandFte}</td>
+                  <td className="num">{r.availableFte}</td>
+                  <td className="num">{r.sprintsNeeded ?? '–'}</td>
+                  <td>
+                    {r.bottleneck && (
+                      <span
+                        className="tag neutral"
+                        title="Its own work takes longest; the forecast already uses its pace"
+                      >
+                        sets the pace
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="card">
@@ -518,43 +522,45 @@ export function AnalysisView({ runId }: { runId: string }) {
             i === 0 ? 'Investment' : `Month ${i} (${monthName(a.value.benefitStart, i - 1)})`
           }
         />
-        <table>
-          <thead>
-            <tr>
-              <th>Scenario</th>
-              <th>KPI effect</th>
-              <th className="num">Revenue / month</th>
-              <th className="num">ROI</th>
-              <th className="num">NPV</th>
-              <th className="num">Payback</th>
-            </tr>
-          </thead>
-          <tbody>
-            {a.value.scenarios.map((s) => (
-              <tr key={s.name}>
-                <td>
-                  {capitalize(s.name)}
-                  <div className="muted small">reach {pct(s.reach)}</div>
-                </td>
-                <td className="small">
-                  {s.kpiChanges.length
-                    ? s.kpiChanges
-                        .map(
-                          (c) =>
-                            `${KPI[c.kpi] ?? c.kpi} ${c.change >= 0 ? '+' : ''}${c.change}${c.unit === '%' ? ' %' : ` ${c.unit}`}${c.capped ? ' (capped)' : ''}`,
-                        )
-                        .join(', ')
-                    : 'no effect'}
-                  <div className="muted">{s.rationale}</div>
-                </td>
-                <td className="num">{usd(s.monthlyRevenueUsd)}</td>
-                <td className="num">{pct(s.roi)}</td>
-                <td className="num">{usd(s.npvUsd)}</td>
-                <td className="num">{s.paybackMonth ? `month ${s.paybackMonth}` : '–'}</td>
+        <div className="table-wide">
+          <table>
+            <thead>
+              <tr>
+                <th>Scenario</th>
+                <th>KPI effect</th>
+                <th className="num">Revenue / month</th>
+                <th className="num">ROI</th>
+                <th className="num">NPV</th>
+                <th className="num">Payback</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {a.value.scenarios.map((s) => (
+                <tr key={s.name}>
+                  <td>
+                    {capitalize(s.name)}
+                    <div className="muted small">reach {pct(s.reach)}</div>
+                  </td>
+                  <td className="small">
+                    {s.kpiChanges.length
+                      ? s.kpiChanges
+                          .map(
+                            (c) =>
+                              `${KPI[c.kpi] ?? c.kpi} ${c.change >= 0 ? '+' : ''}${c.change}${c.unit === '%' ? ' %' : ` ${c.unit}`}${c.capped ? ' (capped)' : ''}`,
+                          )
+                          .join(', ')
+                      : 'no effect'}
+                    <div className="muted">{s.rationale}</div>
+                  </td>
+                  <td className="num">{usd(s.monthlyRevenueUsd)}</td>
+                  <td className="num">{pct(s.roi)}</td>
+                  <td className="num">{usd(s.npvUsd)}</td>
+                  <td className="num">{s.paybackMonth ? `month ${s.paybackMonth}` : '–'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <p className="banner muted-banner">
           <strong>Break-even:</strong> {a.value.breakEvenText}
         </p>

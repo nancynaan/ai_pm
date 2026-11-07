@@ -106,6 +106,13 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
         mode: deps.documents?.mode ?? 'dry-run',
         publishedAt: set?.publishedAt?.toISOString() ?? null,
         canPublish: run.state === 'awaiting_documents' || run.state === 'awaiting_decision',
+        // After the decision the documents are final; the backlog stage keeps them in step.
+        lockedReason:
+          run.state === 'completed' || run.state === 'backlog'
+            ? "You can't publish again: the feature is already approved, and its documents were published successfully."
+            : run.state === 'declined'
+              ? "You can't publish again: the feature was declined, and its documents record that decision."
+              : null,
         running: run.state === 'documenting',
         documents: DOCUMENT_TYPES.map((type) => {
           const row = rows.find((r) => r.type === type);
