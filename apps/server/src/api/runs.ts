@@ -1,5 +1,6 @@
 import {
   answersSchema,
+  type Backlog,
   DOCUMENT_LABEL,
   DOCUMENT_TYPES,
   type DocumentSet,
@@ -13,6 +14,7 @@ import {
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { AnalysisRepository } from '../pipeline-engine/analysis-repository.js';
+import type { BacklogRepository } from '../pipeline-engine/backlog/repository.js';
 import { needsRoadmapProposal } from '../pipeline-engine/calculators/baseline.js';
 import type { DocumentRepository } from '../pipeline-engine/documents/repository.js';
 import type { PresentationRepository } from '../pipeline-engine/presentation/repository.js';
@@ -32,6 +34,8 @@ export interface RunRouteDeps {
   documents?: { repo: Pick<DocumentRepository, 'setOf' | 'documentsOf'>; mode: 'dry-run' | 'live' };
   /** The client deck (stage 05). */
   presentations?: Pick<PresentationRepository, 'get'>;
+  /** The approved feature's Epic and stories in Jira (stage 06). */
+  backlog?: Pick<BacklogRepository, 'backlogOf'>;
 }
 
 const docParams = z.object({ id: z.uuid(), type: documentTypeSchema });
@@ -144,6 +148,17 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
       const { id } = idParams.parse(request.params);
       await deps.pipelineEngine.publishDocuments(id);
       return { ok: true };
+    }),
+  );
+
+  /** The Backlog tab: the Epic and its stories, once an approved feature's backlog is written. */
+  app.get('/api/runs/:id/backlog', async (request, reply) =>
+    handle(reply, async (): Promise<Backlog> => {
+      const { id } = idParams.parse(request.params);
+      // Written only after the client approved, so a backlog means an approved feature.
+      const backlog = await deps.backlog?.backlogOf(id);
+      if (!backlog?.epic) throw new RunActionError('This feature has no backlog in Jira yet', 404);
+      return backlog;
     }),
   );
 

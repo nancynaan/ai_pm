@@ -245,7 +245,7 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
         if (run.state !== 'awaiting_decision')
           throw new RunActionError(`The run is ${run.state}, not waiting for a decision`, 409);
         await repo.saveDecision(run.id, decision, comment);
-        const label = { approve: 'Approve', changes: 'Request changes', decline: 'Decline' }[decision];
+        const label = { approve: 'Approve', decline: 'Decline' }[decision];
         await bus.publish(
           run.id,
           { type: 'message', role: 'client', text: comment ? `${label}: ${comment}` : label },

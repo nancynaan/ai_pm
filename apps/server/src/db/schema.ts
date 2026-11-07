@@ -1,6 +1,7 @@
 import {
   bigserial,
   boolean,
+  doublePrecision,
   integer,
   jsonb,
   pgTable,
@@ -361,3 +362,50 @@ export const presentations = pgTable('presentations', {
   attachmentUrl: text('attachment_url'),
   ...timestamps,
 });
+
+/**
+ * The Jira backlog of an approved feature (stage 06): the backlog builder's draft (reused while
+ * its inputs are unchanged, so a re-run makes no new Claude call) and the last write.
+ */
+export const backlogSets = pgTable('backlog_sets', {
+  runId: uuid('run_id')
+    .primaryKey()
+    .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+  inputHash: text('input_hash').notNull(),
+  draft: jsonb('draft').$type<unknown>().notNull(),
+  /** dry-run | live, of the last write to Jira; null before the first one. */
+  writeMode: text('write_mode'),
+  /** The feature's block on the Initial Product Backlog page. */
+  confluenceUrl: text('confluence_url'),
+  confluenceStatus: text('confluence_status'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  ...timestamps,
+});
+
+/** One row per Jira issue of a run's backlog: the Epic (`local_id` EPIC) and its stories (S-n). */
+export const backlogItems = pgTable(
+  'backlog_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => pipelineRuns.id, { onDelete: 'cascade' }),
+    localId: text('local_id').notNull(),
+    /** epic | story | enabler | nfr | spike */
+    type: text('type').notNull(),
+    summary: text('summary').notNull(),
+    /** Proposed Jira priority, pending the Product Owner's review. */
+    priority: text('priority'),
+    /** PERT expected story points; the team's Story Points stay in Jira. */
+    aiEstimate: doublePrecision('ai_estimate'),
+    requirementCodes: jsonb('requirement_codes').$type<string[]>().notNull().default([]),
+    blockedBy: jsonb('blocked_by').$type<string[]>().notNull().default([]),
+    jiraKey: text('jira_key'),
+    url: text('url'),
+    /** created | updated | unchanged | would_create | would_update | skipped */
+    status: text('status').notNull(),
+    note: text('note'),
+    ...timestamps,
+  },
+  (t) => [unique('backlog_items_run_local').on(t.runId, t.localId)],
+);

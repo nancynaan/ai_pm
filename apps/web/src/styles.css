@@ -248,7 +248,8 @@ header.top h1 a {
 
 nav {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
 }
 
 nav a {
@@ -387,8 +388,15 @@ ul.runs li a {
   border-color: var(--err-text);
 }
 
-.timeline .skipped {
-  text-decoration: line-through;
+/* Declined: the step that cannot start (the backlog) is red. */
+.timeline .stopped {
+  color: var(--err-text);
+  font-weight: 600;
+}
+
+.timeline .stopped .dot {
+  background: var(--err-text);
+  border-color: var(--err-text);
 }
 
 @keyframes pulse {
@@ -641,6 +649,12 @@ table.coverage th {
 }
 
 .banner.failed {
+  background: var(--err-bg);
+  color: var(--err-text);
+  border-color: transparent;
+}
+
+.banner.stopped {
   background: var(--err-bg);
   color: var(--err-text);
   border-color: transparent;

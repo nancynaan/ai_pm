@@ -435,7 +435,72 @@ export const DeckDraft = z.object({
 });
 export type DeckDraft = z.infer<typeof DeckDraft>;
 
+// ---- backlog-builder (BPMN 06) ----------------------------------------------------------------
+
+const step = z.string().min(3).max(300);
+const storyRef = z
+  .string()
+  .regex(/^S-\d+$/)
+  .describe('S-1, S-2 … from the story map');
+
+/** The text of the Epic and one story per story-map item; code adds priority, estimate and links. */
+export const BacklogDraft = z.object({
+  epic: z.object({
+    overview: z
+      .string()
+      .min(40)
+      .max(900)
+      .describe('What the feature is and why it matters, high level, two to four sentences'),
+    outcome: z
+      .string()
+      .min(20)
+      .max(500)
+      .describe('How the Product Owner will judge success, in one or two sentences'),
+  }),
+  stories: z
+    .array(
+      z.object({
+        ref: storyRef,
+        summary: z.string().min(10).max(110).describe('Jira summary: short, specific, no ref prefix'),
+        userStory: z
+          .string()
+          .min(30)
+          .max(400)
+          .describe('Connextra form: "As a <role>, I want <goal>, so that <benefit>."'),
+        context: z
+          .string()
+          .min(30)
+          .max(900)
+          .describe('What to build and why, notes for the team; Markdown paragraphs or "- " lists'),
+        acceptanceCriteria: z
+          .array(
+            z.object({
+              scenario: z.string().min(5).max(120),
+              given: z.array(step).min(1).max(4),
+              when: z.array(step).min(1).max(3),
+              then: z.array(step).min(1).max(5),
+            }),
+          )
+          .min(1)
+          .max(6)
+          .describe('Gherkin scenarios; NFR items state the measure the requirement names'),
+        blockedBy: z
+          .array(storyRef)
+          .max(5)
+          .describe('Items that must be done first (enablers, spikes); empty when none'),
+        openQuestions: z
+          .array(z.string().min(10).max(300))
+          .max(3)
+          .describe('What Backlog Refinement must clarify; empty when nothing is open'),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
+export type BacklogDraft = z.infer<typeof BacklogDraft>;
+
 export const AGENT_SCHEMAS: Record<string, z.ZodType> = {
+  BacklogDraft,
   DocumentDraft,
   DeckDraft,
   EstimationResult,

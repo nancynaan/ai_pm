@@ -68,6 +68,28 @@ const transitionsSchema = z.object({
 });
 export type JiraTransition = z.infer<typeof transitionsSchema>['transitions'][number];
 
+const linkedIssue = z.object({ key: z.string() }).optional();
+const issueLinksSchema = z.object({
+  fields: z.object({
+    issuelinks: z
+      .array(
+        z.object({
+          id: z.string(),
+          type: z.object({ name: z.string() }),
+          inwardIssue: linkedIssue,
+          outwardIssue: linkedIssue,
+        }),
+      )
+      .default([]),
+  }),
+});
+export interface JiraIssueLink {
+  id: string;
+  type: string;
+  inward: string | null;
+  outward: string | null;
+}
+
 const valuesOf = <T extends z.ZodType>(item: T) => z.object({ values: z.array(item) });
 const projectSchemeSchema = valuesOf(z.object({ issueTypeScreenScheme: z.object({ id }) }));
 const schemeMappingSchema = valuesOf(z.object({ screenSchemeId: id }));
@@ -198,6 +220,47 @@ export function jiraApi(http: AtlassianHttp) {
 
     async transitionIssue(key: string, transitionId: string) {
       await http.post(`${issuePath(key)}/transitions`, { body: { transition: { id: transitionId } } });
+    },
+
+    /** The issue's links, seen from this issue (`inward` = the other issue is the inward side). */
+    async issueLinks(key: string): Promise<JiraIssueLink[]> {
+      const issue = issueLinksSchema.parse(
+        await http.get(issuePath(key), { query: { fields: 'issuelinks' } }),
+      );
+      return issue.fields.issuelinks.map((l) => ({
+        id: l.id,
+        type: l.type.name,
+        inward: l.inwardIssue?.key ?? null,
+        outward: l.outwardIssue?.key ?? null,
+      }));
+    },
+
+    /**
+     * Links two issues with a link type such as Blocks. For Blocks, `outwardKey` blocks
+     * `inwardKey` (the inward issue "is blocked by" the outward one).
+     */
+    async createIssueLink(type: string, outwardKey: string, inwardKey: string) {
+      await http.post('/rest/api/3/issueLink', {
+        body: { type: { name: type }, outwardIssue: { key: outwardKey }, inwardIssue: { key: inwardKey } },
+      });
+    },
+
+    async deleteIssueLink(linkId: string) {
+      await http.delete(`/rest/api/3/issueLink/${encodeURIComponent(linkId)}`);
+    },
+
+    /** Creates or updates (by `globalId`) a web link on the issue. */
+    async upsertRemoteLink(key: string, link: { globalId: string; url: string; title: string }) {
+      await http.post(`${issuePath(key)}/remotelink`, {
+        body: { globalId: link.globalId, object: { url: link.url, title: link.title } },
+      });
+    },
+
+    async listPriorities(): Promise<string[]> {
+      return z
+        .array(z.object({ name: z.string() }))
+        .parse(await http.get('/rest/api/3/priority'))
+        .map((p) => p.name);
     },
   };
 }

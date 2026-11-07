@@ -24,7 +24,6 @@ describe('state machine', () => {
 
   it('maps decisions to states', () => {
     expect(stateAfterDecision('approve')).toBe('backlog');
-    expect(stateAfterDecision('changes')).toBe('analyzing');
     expect(stateAfterDecision('decline')).toBe('declined');
   });
 });
@@ -34,7 +33,7 @@ function setupEngine(
   handlers: StageHandlers,
   options: {
     lockFree?: () => boolean;
-    onDecision?: (run: RunRecord, decision: 'approve' | 'changes' | 'decline') => Promise<string | null>;
+    onDecision?: (run: RunRecord, decision: 'approve' | 'decline') => Promise<string | null>;
   } = {},
 ) {
   const runs = new Map<string, RunRecord>();
@@ -209,8 +208,8 @@ describe('pipeline engine', () => {
         },
       },
     );
-    const expected = { approve: 'backlog', changes: 'analyzing', decline: 'declined' } as const;
-    for (const decision of ['approve', 'changes', 'decline'] as const) {
+    const expected = { approve: 'backlog', decline: 'declined' } as const;
+    for (const decision of ['approve', 'decline'] as const) {
       const run = await h.pipelineEngine.createRun(`A feature to ${decision}`);
       h.runs.get(run.id)!.state = 'awaiting_decision';
       await h.pipelineEngine.decide(run.id, { decision });
@@ -220,9 +219,9 @@ describe('pipeline engine', () => {
       );
     }
     await new Promise((resolve) => setTimeout(resolve, 0)); // the hook runs after the action
-    expect(recorded).toEqual(['approve', 'changes', 'decline']);
+    expect(recorded).toEqual(['approve', 'decline']);
     const texts = h.events.flatMap((e) => (e.type === 'message' && e.role === 'ai' ? [e.text] : []));
-    expect(texts).toEqual(['Recorded: approve', 'Recorded: changes']);
+    expect(texts).toEqual(['Recorded: approve']);
   });
 
   it('goes straight to the backlog with auto-approve on', async () => {

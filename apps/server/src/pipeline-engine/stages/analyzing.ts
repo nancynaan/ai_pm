@@ -16,10 +16,9 @@ const BASELINE_FOR_IMPACT = ['architecture_overview', 'game_design_document'];
 export function analyzingStage(services: StageServices): StageHandler {
   return async (ctx) => {
     const { run } = ctx;
-    const [discovery, answered, decision, discoveryDecision, backlog, components, texts] = await Promise.all([
+    const [discovery, answered, discoveryDecision, backlog, components, texts] = await Promise.all([
       ctx.repo.latestStageOutput(run.id, 'eliciting') as Promise<Partial<DiscoveryOutput> | null>,
       ctx.repo.answeredQuestionnaires(run.id),
-      ctx.repo.latestDecision(run.id),
       ctx.repo.latestDecision(run.id, 'discovery'),
       services.context.backlog(),
       services.context.components(run.projectId),
@@ -52,14 +51,6 @@ export function analyzingStage(services: StageServices): StageHandler {
           '(none)',
       ),
       section('Assumptions so far', assumptions.map((a) => `- ${a}`).join('\n') || '(none)'),
-      ...(decision?.decision === 'changes'
-        ? [
-            section(
-              'Changes the client asked for after the last assessment',
-              decision.comment ?? '(no comment)',
-            ),
-          ]
-        : []),
       section('Current Jira backlog', backlog),
     ];
     const baseline = (types: string[]) =>

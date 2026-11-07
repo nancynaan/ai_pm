@@ -39,6 +39,9 @@ const SHARED_PAGE: Partial<Record<DocumentType, string>> = {
   assumption_log: 'confluence:page:seed:assumption_log',
 };
 const pageKey = (runId: string, type: DocumentType) => `run:${runId}:${type}`;
+/** Sync-log keys of the Initial Product Backlog page and of a feature's block on it (stage 06). */
+export const INITIAL_BACKLOG_PAGE = 'confluence:page:seed:initial_backlog';
+export const initialBacklogKey = (runId: string) => `run:${runId}:initial_backlog`;
 
 /**
  * Publishes a feature's documents through the idempotent publisher (BPMN 04): the shared
@@ -60,10 +63,15 @@ export function createDocumentPublisher(opts: DocumentPublisherOptions) {
 
     /** Confluence links known before publishing (from earlier publishes and the seed). */
     async knownLinks(runId: string): Promise<Links> {
+      // The Epic and the Initial Product Backlog block exist once the backlog stage wrote them.
+      const epicKey = (await store.get(`jira:issue:run:${runId}:epic`))?.externalKey;
+      const backlogBlock = await store.get(`confluence:block:${initialBacklogKey(runId)}`);
       return {
         brief: url(await known(`confluence:page:${pageKey(runId, 'feature_brief')}`)),
         riskRegister: url(await known(SHARED_PAGE.risk_register!)),
         assumptionLog: url(await known(SHARED_PAGE.assumption_log!)),
+        epic: epicKey && opts.siteUrl ? `${opts.siteUrl}/browse/${epicKey}` : null,
+        initialBacklog: backlogBlock ? url(backlogBlock.externalId) : null,
       };
     },
 
@@ -186,4 +194,3 @@ export function createDocumentPublisher(opts: DocumentPublisherOptions) {
 }
 
 export type DocumentPublisher = ReturnType<typeof createDocumentPublisher>;
-

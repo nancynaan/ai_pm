@@ -15,7 +15,10 @@ import { createDocumentPublisher } from './pipeline-engine/documents/publish.js'
 import { createDocumentRepository } from './pipeline-engine/documents/repository.js';
 import { loadTemplates } from './pipeline-engine/documents/templates.js';
 import { documentingStage } from './pipeline-engine/stages/documenting.js';
-import { recordDecision } from './pipeline-engine/documents/decision.js';
+import { recordDecision, republishDocuments } from './pipeline-engine/documents/decision.js';
+import { createBacklogRepository } from './pipeline-engine/backlog/repository.js';
+import { createBacklogWriter } from './pipeline-engine/backlog/write.js';
+import { backlogStage } from './pipeline-engine/stages/backlog.js';
 import { createPresentationRepository } from './pipeline-engine/presentation/repository.js';
 import { PPTX_TYPE, presentingStage } from './pipeline-engine/stages/presenting.js';
 import { createPublisher } from './sync/publisher.js';
@@ -31,7 +34,6 @@ import { loadDiscoveryConfig } from './pipeline-engine/discovery-config.js';
 import { elicitingStage } from './pipeline-engine/stages/eliciting.js';
 import { estimatingStage } from './pipeline-engine/stages/estimating.js';
 import { intakeStage } from './pipeline-engine/stages/intake.js';
-import { placeholderStages } from './pipeline-engine/stages/placeholder.js';
 import { buildProbes } from './health/checks.js';
 import { createAtlassianGateway } from './integrations/atlassian/index.js';
 import { createClaudeCli } from './integrations/claude-cli.js';
@@ -69,6 +71,7 @@ async function main() {
   const analysis = createAnalysisRepository(db);
   const documentRepo = createDocumentRepository(db);
   const presentationRepo = createPresentationRepository(db);
+  const backlogRepo = createBacklogRepository(db);
   const bus = createEventBus(repo);
   // Created after the database is ready; routes only receive requests after listen().
   const pipeline: { pipelineEngine?: ReturnType<typeof createPipelineEngine> } = {};
@@ -87,6 +90,7 @@ async function main() {
       assessments: analysis,
       documents: { repo: documentRepo, mode: config.atlassian.writeMode },
       presentations: presentationRepo,
+      backlog: backlogRepo,
     },
     webDistDir: existsSync(webDistDir) ? webDistDir : undefined,
   });
@@ -194,16 +198,40 @@ async function main() {
     },
   };
 
+  // Stage 06: the approved feature's Epic and stories in Jira, and its block on the Initial Product Backlog.
+  const builder = definitions.get('backlog-builder');
+  if (!builder) throw new Error('agents/backlog-builder.agent.md is missing');
+  const republishDeps = {
+    analysis,
+    context: services.context,
+    repo,
+    documents: documentRepo,
+    publisher: documentServices.publisher,
+    templates,
+  };
+  const backlogServices = {
+    repo: backlogRepo,
+    documents: documentRepo,
+    writer: createBacklogWriter({
+      gateway: stageGateway,
+      store: drizzleSyncLog(db),
+      mode: config.atlassian.writeMode,
+      jiraProjectKey: config.atlassian.jiraProjectKey,
+      siteUrl: config.atlassian.siteUrl,
+    }),
+    republish: (run: Parameters<typeof republishDocuments>[1]) => republishDocuments(republishDeps, run),
+    builderVersion: createHash('sha256')
+      .update(JSON.stringify(builder))
+      .update(builder.skills.map((name) => loadSkill(name).body).join('\n'))
+      .digest('hex'),
+  };
+
   const pipelineEngine = createPipelineEngine({
     repo,
     bus,
     queue: createPgBossQueue(config.databaseUrl, (err) => app.log.error({ err }, 'job queue error')),
     pool,
     handlers: {
-      ...placeholderStages({
-        delayMs: config.pipeline.placeholderDelayMs,
-        autoApprove: config.pipeline.clientGateAutoApprove,
-      }),
       intake: intakeStage(services),
       // eliciting = the discovery completeness check
       eliciting: elicitingStage(services),
@@ -211,18 +239,14 @@ async function main() {
       estimating: estimatingStage(services),
       documenting: documentingStage({ ...services, documents: documentServices }),
       presenting: presentingStage({ ...services, presentation: presentationServices }),
+      backlog: backlogStage({ ...services, backlog: backlogServices }),
     },
     log: app.log,
     // The Decision Log: the decision goes to the Feature Brief and the Assumption Log block.
     onDecision: (run, decision) =>
       recordDecision(
         {
-          analysis,
-          context: services.context,
-          repo,
-          documents: documentRepo,
-          publisher: documentServices.publisher,
-          templates,
+          ...republishDeps,
           closeEpic: (key) =>
             jiraPublisher()?.ensureStatus(key, 'done') ?? Promise.resolve('no transition' as const),
         },

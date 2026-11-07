@@ -54,7 +54,11 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
   const baseUrl = credentials.siteUrl.replace(/\/+$/, '');
   const authorization = `Basic ${Buffer.from(`${credentials.email}:${credentials.apiToken}`).toString('base64')}`;
 
-  async function request<T>(method: string, path: string, { query, body, form }: RequestOptions = {}): Promise<T> {
+  async function request<T>(
+    method: string,
+    path: string,
+    { query, body, form }: RequestOptions = {},
+  ): Promise<T> {
     if (options.readOnly && method !== 'GET' && !(method === 'POST' && READ_ONLY_POSTS.has(path))) {
       throw new ReadOnlyViolation(`Blocked ${method} ${path}: Atlassian writes are in dry-run mode`);
     }
@@ -97,6 +101,7 @@ export function createAtlassianHttp(credentials: AtlassianCredentials, options: 
     get: <T>(path: string, options?: Omit<RequestOptions, 'body'>) => request<T>('GET', path, options),
     post: <T>(path: string, options?: RequestOptions) => request<T>('POST', path, options),
     put: <T>(path: string, options?: RequestOptions) => request<T>('PUT', path, options),
+    delete: <T>(path: string) => request<T>('DELETE', path),
   };
 }
 

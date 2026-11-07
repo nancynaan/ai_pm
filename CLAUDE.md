@@ -50,7 +50,7 @@ Slash commands: `/rebuild` (build, restart, health), `/eval` (in-memory eval, de
 
 ## Status
 
-Phases 0–6 are done (Phase 6: three-slide client deck, PPTX on the Feature Brief, decision gate with the Decision Log; demo run deck v1.1 live). Next is Phase 7: backlog in Jira. One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer) and `… --presenter` (presenter). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).
+Phases 0–7 are done (Phase 7: Approve/Decline only; after Approve the Epic and one story per story-map item go to Jira as an AI draft, the Initial Product Backlog gets the feature's block, and a Backlog tab appears). Next is Phase 8: sprint reminders (plus the PO notification email moved from Phase 7). One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).
 
 ## Current Focus
 
@@ -58,10 +58,10 @@ Updated 2026-11-07. Read this before starting work in a new chat.
 
 ### Where we are
 
-- **Done and pushed:** Phases 0–6 and a separate UI commit (`5cf0dbd` Phase 5, `5383ecd` Phase 6, `71d3899` UI). `main` is in sync with `origin/main`; nothing is uncommitted.
-- **Next: Phase 7, backlog in Jira** (plan row 7 in `../docs/IMPLEMENTATION_PLAN.md`). Not started; run `/phase` and agree the plan with the user before writing code.
+- **Done and pushed:** Phases 0–6 and a separate UI commit (`5cf0dbd` Phase 5, `5383ecd` Phase 6, `71d3899` UI). **Phase 7** is done and verified, including a live Approve on the demo run; check `git log` for its commit.
+- **Next: Phase 8, reminders** (plan row 8 in `../docs/IMPLEMENTATION_PLAN.md`), including the PO notification email for an approved backlog. Run `/phase` and agree the plan with the user before writing code.
 - **Write mode is live** (`ATLASSIAN_WRITE_MODE=live`, set by the user). Every publish writes to the real Confluence space `AIPMconf` and Jira project `AIPM`. Ask before any action that writes something new.
-- **Demo run** `4b5ea878-fb47-48da-859a-73e8c2a1530c` (rewarded-menu-chest, title "Add a free gift chest to the main menu"): verdict Go, documents published live as FA-1 (Feature Brief v2 with the deck embedded, Requirements Specification, Estimation & Release Forecast, Roadmap Update Proposal, blocks on the Risk Register and Assumption Log), deck v1.1 attached to the Brief as `FA-1 Feature Proposal.pptx`. It waits in `awaiting_decision`. **Do not press Approve, Request changes or Decline without the user's OK**: Approve starts Phase 7's backlog stage. Its chat history was cleaned by hand to one block per step; keep it that way.
+- **Demo run** `4b5ea878-fb47-48da-859a-73e8c2a1530c` (rewarded-menu-chest, title "Add a free gift chest to the main menu"): verdict Go, documents published live as FA-1 (Feature Brief v3 "… (AIPM-28)" with the deck embedded and the approval, Requirements Specification, Estimation & Release Forecast, Roadmap Update Proposal, blocks on the Risk Register, Assumption Log and Initial Product Backlog), deck v1.1 attached to the Brief as `FA-1 Feature Proposal.pptx`. **Approved live on 2026-11-07 and `completed`:** Epic AIPM-28 with Stories AIPM-29…AIPM-41 in Jira as an AI draft. Its chat history is one block per step; keep it that way. Re-running its backlog stage would only update the same issues, but ask first: it writes to Jira.
 
 ### Decisions made in Phases 5–6 and the UI work
 
@@ -73,12 +73,14 @@ Updated 2026-11-07. Read this before starting work in a new chat.
 - **UI:** home page with only System status; feature screens with Chat / Analysis / Documents / Presentation tabs; gradient theme with light neumorphism; pinned chocolate navigation bar. Details in `apps/web/CLAUDE.md`.
 - **Evals:** the user wants Claude calls kept low. Prefer one-agent evals (`writer-cli.js --run <id>`, `… --presenter`, one call each) over the full `/eval` (about 8 calls). A record/replay cache for the full eval was proposed but not built.
 
-### What Phase 7 has to settle
+### Decisions made in Phase 7
 
-- **No RTM:** the user dropped the traceability matrix. Keep the requirement coverage gate (every requirement covered by at least one story, from the story map's REQ codes) and store the Jira keys in the database; nothing is written back to an RTM page.
-- **The Epic:** the demo run has no draft Epic (intake ran in dry-run), so the backlog stage must create the Epic if it is missing, not only complete it.
-- **Stories:** the Requirements Specification's draft acceptance criteria become Gherkin per story; story-map items become stories and spikes with `AI estimate (SP)` (the team's Story Points stay empty), `Blocks` links, priority and labels; the Initial Product Backlog page gets the new Epic (the user asked for this to happen when stories go to Jira).
-- **Chat and docs:** follow the one-block-per-step rule for the backlog cards; update BPMN model 06 (in `../docs/bpmn`, generated from `generator/processes.mjs`) once the design is agreed.
+- **Two decisions only:** Approve or Decline; "Request changes" is gone from code, UI, plan and BPMN. A decline records the decision on the Brief and the Assumption Log, closes the draft Epic and the conversation; the Backlog step turns red and the pill reads Declined. An approval ends in `completed`, shown as Approved with every step green.
+- **The backlog is an AI draft, not a sprint plan:** Epic and Stories in To Do, label `ai-draft` (plus `ai-pm`, `fa-<n>`, and `enabler`/`nfr`/`spike`), no sprint, Story Points empty, `AI estimate (SP)` = PERT expected points, priority proposed by code (MoSCoW, +1 for starting points that unblock others) and marked "pending PO review", Gherkin acceptance criteria in the description. One backlog-builder call (cached in `backlog_sets`); code does every number.
+- **Idempotent:** sync-log keys plus marker labels; a second run updates the same issues (an unchanged payload is skipped) and `Blocks` links are checked first. The Epic is created when intake left none.
+- **Coverage gate:** every requirement except Won't has a story; Jira keys are stored in `backlog_items` (no RTM).
+- **Confluence after Jira:** a block per feature on the Initial Product Backlog page; the documents are re-rendered (Epic key in the Brief title, Epic and backlog links, the approval).
+- **PO notification email:** moved to Phase 8.
 
 ### Open, not urgent
 

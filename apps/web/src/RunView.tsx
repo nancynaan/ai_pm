@@ -10,6 +10,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { api, errorText } from './api.js';
 import { DiscoveryDecisionCard, DiscoveryReportCard, QuestionnaireCard } from './Discovery.js';
+import { BACKLOG_CHANGED, BacklogCard } from './Backlog.js';
 import { DocumentsCard } from './Documents.js';
 import { PresentationCard } from './Presentation.js';
 import { STATE_LABEL } from './labels.js';
@@ -33,7 +34,7 @@ const POSITION: Record<RunState, number> = {
   failed: 0,
 };
 
-type StepStatus = 'done' | 'active' | 'waiting' | 'failed' | 'pending' | 'skipped';
+type StepStatus = 'done' | 'active' | 'waiting' | 'failed' | 'pending' | 'stopped';
 
 function stepStatus(index: number, run: RunSummary): StepStatus {
   const state = run.state;
@@ -44,7 +45,8 @@ function stepStatus(index: number, run: RunSummary): StepStatus {
   const at = POSITION[state];
   if (index < at) return 'done';
   if (index > at) return 'pending';
-  if (state === 'declined') return 'skipped';
+  // Declined: the backlog step can never start.
+  if (state === 'declined') return 'stopped';
   if (
     state === 'awaiting_answers' ||
     state === 'awaiting_decision' ||
@@ -81,6 +83,9 @@ export function RunView({ runId }: { runId: string }) {
       );
       if (stored.event.type === 'state' || stored.event.type === 'questionnaire') refresh();
       if (stored.event.type === 'state' || stored.event.type === 'documents') setDocsVersion((v) => v + 1);
+      // The header shows the Backlog tab once the backlog is in Jira.
+      if (stored.event.type === 'backlog_ready' || stored.event.type === 'state')
+        window.dispatchEvent(new Event(BACKLOG_CHANGED));
     });
     return () => source.close();
   }, [runId, refresh]);
@@ -127,9 +132,15 @@ export function RunView({ runId }: { runId: string }) {
             {stored.id === documentsAnchorId && <DocumentsCard runId={run.id} version={docsVersion} />}
           </Fragment>
         ))}
-        {run.state === 'completed' && <p className="banner ok">This feature request is complete.</p>}
+        {run.state === 'completed' && (
+          <p className="banner ok">
+            Approved: the Epic and its stories are in the Product Backlog. This conversation is closed.
+          </p>
+        )}
         {run.state === 'declined' && (
-          <p className="banner">The feature request was stopped. Nothing was added to the backlog.</p>
+          <p className="banner stopped">
+            Declined: nothing was added to the backlog. This conversation is closed.
+          </p>
         )}
         {run.state === 'failed' && <FailedBanner run={run} />}
       </section>
@@ -223,6 +234,8 @@ function EventItem({
       ) : null;
     case 'presentation_ready':
       return <PresentationCard runId={run.id} label={event.label} />;
+    case 'backlog_ready':
+      return <BacklogCard runId={run.id} version={JSON.stringify(event)} />;
     case 'state':
     case 'documents':
       return null;
@@ -244,7 +257,7 @@ function DecisionCard({
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  const decide = async (decision: 'approve' | 'changes' | 'decline') => {
+  const decide = async (decision: 'approve' | 'decline') => {
     setSending(true);
     setError(null);
     try {
@@ -280,9 +293,6 @@ function DecisionCard({
           <div className="actions">
             <button type="button" className="stop" disabled={sending} onClick={() => void decide('decline')}>
               Decline
-            </button>
-            <button type="button" disabled={sending} onClick={() => void decide('changes')}>
-              Request changes
             </button>
             <button type="button" className="go" disabled={sending} onClick={() => void decide('approve')}>
               Approve

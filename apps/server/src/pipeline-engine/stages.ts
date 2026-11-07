@@ -28,7 +28,7 @@ const TRANSITIONS: Record<RunState, readonly RunState[]> = {
   // First publish → presentation; a re-publish from the decision step goes back to the decision.
   documenting: ['presenting', 'awaiting_decision'],
   presenting: ['awaiting_decision', 'backlog'],
-  awaiting_decision: ['backlog', 'analyzing', 'declined', 'documenting'],
+  awaiting_decision: ['backlog', 'declined', 'documenting'],
   backlog: ['completed'],
   completed: [],
   declined: [],
@@ -53,4 +53,4 @@ export function assertTransition(from: RunState, to: RunState) {
 }
 
 export const stateAfterDecision = (decision: Decision['decision']): RunState =>
-  decision === 'approve' ? 'backlog' : decision === 'changes' ? 'analyzing' : 'declined';
+  decision === 'approve' ? 'backlog' : 'declined';

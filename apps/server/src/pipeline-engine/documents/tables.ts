@@ -133,7 +133,6 @@ const KIND: Record<string, string> = {
 
 const DECISION_LABEL: Record<string, string> = {
   approve: 'Approved',
-  changes: 'Changes requested',
   decline: 'Declined',
   proceed: 'Continue with a preliminary assessment',
   stop: 'Stopped',
@@ -145,7 +144,14 @@ export interface TableContext {
   inputs: DocumentInputs;
   figures: Figures;
   /** Confluence links, when known. */
-  links: { brief: string | null; riskRegister: string | null; assumptionLog: string | null };
+  links: {
+    brief: string | null;
+    riskRegister: string | null;
+    assumptionLog: string | null;
+    /** The Jira Epic and the Initial Product Backlog page, once the backlog is in Jira. */
+    epic?: string | null;
+    initialBacklog?: string | null;
+  };
 }
 
 /** {{table:x}} and {{list:x}} contents by name. */
@@ -267,6 +273,16 @@ export function tables({ inputs, figures, links }: TableContext): Record<string,
       bullets([
         `Risk Register: ${figures.fa} block with this feature's risks${links.riskRegister ? ` (${links.riskRegister})` : ''}`,
         `Assumption Log: ${figures.fa} block with assumptions, decisions and unresolved issues${links.assumptionLog ? ` (${links.assumptionLog})` : ''}`,
+        ...(links.epic
+          ? [
+              `Jira Epic ${figures.epic}: the AI-drafted backlog, pending Product Owner review (${links.epic})`,
+            ]
+          : []),
+        ...(links.initialBacklog
+          ? [
+              `Initial Product Backlog: ${figures.fa} block with the Epic and its stories (${links.initialBacklog})`,
+            ]
+          : []),
       ]),
 
     // ---- Requirements Specification

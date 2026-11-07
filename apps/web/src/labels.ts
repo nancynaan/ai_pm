@@ -12,7 +12,7 @@ export const STATE_LABEL: Record<RunState, string> = {
   presenting: 'Preparing presentation',
   awaiting_decision: 'Waiting for your decision',
   backlog: 'Creating backlog',
-  completed: 'Completed',
+  completed: 'Approved',
   declined: 'Declined',
   failed: 'Failed',
 };

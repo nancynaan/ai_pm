@@ -85,7 +85,6 @@ export function draftTexts(draft: DocumentDraft, inputs: DocumentInputs): Record
 
 const DECISION: Record<string, { label: string; colour: 'Green' | 'Yellow' | 'Red' }> = {
   approve: { label: 'Approved', colour: 'Green' },
-  changes: { label: 'Changes requested', colour: 'Yellow' },
   decline: { label: 'Declined', colour: 'Red' },
 };
 

@@ -119,6 +119,7 @@ describe('the real agents and skills', () => {
   it('all load, and every agent has an output schema and existing skills', () => {
     const definitions = loadAgentDefinitions();
     expect([...definitions.keys()].sort()).toEqual([
+      'backlog-builder',
       'discovery-review',
       'elicitation',
       'estimator',

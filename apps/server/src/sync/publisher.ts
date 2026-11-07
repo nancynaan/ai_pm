@@ -49,6 +49,8 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
     return result;
   };
   const issueUrl = (key: string) => `${gateway.siteUrl}/browse/${key}`;
+  /** Set when a Blocks link came out reversed, so the next ones are sent the other way round. */
+  let blocksSwapped = false;
   const pageUrl = (id: string) => `${gateway.siteUrl}/wiki/pages/viewpage.action?pageId=${id}`;
 
   /** Retries once without optional fields Jira refuses (e.g. a field missing from the screen). */
@@ -225,6 +227,63 @@ export function createPublisher({ gateway, store, mode, jiraProjectKey }: Publis
       if (!transition) return 'no transition';
       await gateway.jira.transitionIssue(issueKey, transition.id);
       return 'changed';
+    },
+
+    /**
+     * "`blocker` blocks `blocked`": created once. Jira lists the link on the blocked issue with the
+     * blocker on the inward side; if a link comes out the other way round, it is replaced.
+     */
+    async ensureBlocksLink(
+      blocker: string,
+      blocked: string,
+    ): Promise<'created' | 'unchanged' | 'would create' | 'skipped'> {
+      if (isPlaceholder(blocker) || isPlaceholder(blocked)) return live ? 'skipped' : 'would create';
+      const isBlocks = (type: string) => type.toLowerCase() === 'blocks';
+      const find = async () => {
+        const links = (await gateway.jira.issueLinks(blocked)).filter((l) => isBlocks(l.type));
+        return {
+          right: links.find((l) => l.inward === blocker),
+          reversed: links.find((l) => l.outward === blocker),
+        };
+      };
+      if ((await find()).right) return 'unchanged';
+      if (!live) return 'would create';
+      const create = () =>
+        blocksSwapped
+          ? gateway.jira.createIssueLink('Blocks', blocked, blocker)
+          : gateway.jira.createIssueLink('Blocks', blocker, blocked);
+      await create();
+      const after = await find();
+      if (!after.right && after.reversed) {
+        // The site reads the two sides the other way round: fix this one and remember it.
+        await gateway.jira.deleteIssueLink(after.reversed.id);
+        blocksSwapped = !blocksSwapped;
+        await create();
+      }
+      return 'created';
+    },
+
+    /** A web link on an issue (e.g. the Feature Brief on the Epic), written when it changed. */
+    async ensureRemoteLink(input: { key: string; issueKey: string; url: string; title: string }) {
+      if (isPlaceholder(input.issueKey)) return live ? 'skipped' : 'would create';
+      const idempotencyKey = `jira:remotelink:${input.key}`;
+      const payloadHash = hash({ issue: input.issueKey, url: input.url, title: input.title });
+      if ((await store.get(idempotencyKey))?.payloadHash === payloadHash) return 'unchanged';
+      if (!live) return 'would create';
+      await gateway.jira.upsertRemoteLink(input.issueKey, {
+        globalId: `aipm:${input.key}`,
+        url: input.url,
+        title: input.title,
+      });
+      await store.save({
+        idempotencyKey,
+        system: 'jira',
+        entityType: 'remote_link',
+        externalId: input.issueKey,
+        payloadHash,
+        lastAction: 'updated',
+      });
+      return 'created';
     },
 
     /**

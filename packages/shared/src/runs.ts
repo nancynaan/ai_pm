@@ -177,7 +177,8 @@ export const discoveryConfirmationSchema = z.object({
 export type DiscoveryConfirmation = z.infer<typeof discoveryConfirmationSchema>;
 
 export const decisionSchema = z.object({
-  decision: z.enum(['approve', 'changes', 'decline']),
+  /** The client approves the feature (backlog in Jira) or declines it; there is no third way. */
+  decision: z.enum(['approve', 'decline']),
   comment: z.string().trim().max(2000).optional(),
 });
 export type Decision = z.infer<typeof decisionSchema>;
@@ -212,6 +213,14 @@ export const runEventSchema = z.discriminatedUnion('type', [
     type: z.literal('decision_requested'),
     verdict: z.string(),
     highlights: z.array(z.string()),
+  }),
+  /** The Epic and its stories are in Jira (or, in dry-run, checked); the card links to the Epic. */
+  z.object({
+    type: z.literal('backlog_ready'),
+    epicKey: z.string().nullable(),
+    epicUrl: z.string().nullable(),
+    stories: z.number().int(),
+    mode: z.enum(['dry-run', 'live']),
   }),
   z.object({ type: z.literal('state'), state: runStateSchema }),
 ]);

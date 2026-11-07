@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { AnalysisList, AnalysisView } from './Analysis.js';
+import { BacklogTab, useHasBacklog } from './Backlog.js';
 import { ChatHome } from './ChatHome.js';
 import { DocumentPreview, DocumentsTab } from './Documents.js';
 import { PresentationTab, PresentationView } from './Presentation.js';
 import { RunView } from './RunView.js';
 import { StatusPage } from './StatusPage.js';
 
-/** The four views of one feature request, shown as tabs in the header. */
+/** The views of one feature request, shown as tabs in the header; Backlog only once it is in Jira. */
 const TABS = [
   { id: 'chat', label: 'Chat', path: '' },
   { id: 'analysis', label: 'Analysis', path: '/analysis' },
   { id: 'documents', label: 'Documents', path: '/documents' },
   { id: 'presentation', label: 'Presentation', path: '/presentation' },
+  { id: 'backlog', label: 'Backlog', path: '/backlog' },
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
@@ -25,7 +27,7 @@ const UUID = '([0-9a-f-]{36})';
 
 function parseHash(hash: string): Route {
   const feature = new RegExp(
-    `^#/runs/${UUID}(?:/(analysis|documents|presentation)(?:/([a-z_]+))?)?$`,
+    `^#/runs/${UUID}(?:/(analysis|documents|presentation|backlog)(?:/([a-z_]+))?)?$`,
     'i',
   ).exec(hash);
   if (feature?.[1]) {
@@ -49,9 +51,10 @@ export function navigate(hash: string) {
 }
 
 function FeatureTabs({ runId, tab }: { runId: string; tab: Tab }) {
+  const hasBacklog = useHasBacklog(runId);
   return (
     <nav aria-label="Feature views">
-      {TABS.map((t) => (
+      {TABS.filter((t) => t.id !== 'backlog' || hasBacklog || tab === 'backlog').map((t) => (
         <a key={t.id} href={`#/runs/${runId}${t.path}`} aria-current={t.id === tab ? 'page' : undefined}>
           {t.label}
         </a>
@@ -79,6 +82,8 @@ function FeatureView({ route }: { route: Extract<Route, { page: 'feature' }> }) 
       ) : (
         <PresentationTab key={runId} runId={runId} />
       );
+    case 'backlog':
+      return <BacklogTab key={runId} runId={runId} />;
   }
 }
 
