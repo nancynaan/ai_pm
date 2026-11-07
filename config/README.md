@@ -1,8 +1,8 @@
 # Config
 
-Project settings as YAML, added as the phases need them:
+Project settings as YAML, validated at startup:
 
-- `cadence.yaml`: sprint length, event times, reminder lead times
-- `rates.yaml`: team roles, FTE and hourly rates (USD)
-- `feasibility-rules.yaml`: Go / Go with conditions / No-Go thresholds
-- `jira-mapping.yaml`: priorities, labels and field names
+- `discovery.yaml`: the fixed discovery questionnaire, contradiction rules and limits
+- `feasibility-rules.yaml`: forecast, risk, contingency, value model, WSJF and the Go / Go with conditions / No-Go thresholds
+
+Team roles, FTE and hourly rates are part of the project baseline (`seed/baseline/data/team.yaml`).

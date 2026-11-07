@@ -30,13 +30,6 @@ const envSchema = z.object({
   CLIENT_GATE_AUTO_APPROVE: flag(false),
   PIPELINE_PLACEHOLDER_DELAY_MS: z.preprocess(blank, z.coerce.number().int().min(0).default(1500)),
 
-  SMTP_HOST: optionalString,
-  MAILPIT_HOST: z.preprocess(blank, z.string().default('localhost')),
-  SMTP_PORT: z.preprocess(blank, z.coerce.number().int().positive().default(1025)),
-  SMTP_USER: optionalString,
-  SMTP_PASSWORD: optionalString,
-  SMTP_SECURE: flag(false),
-  NOTIFY_FROM: z.preprocess(blank, z.string().default('ai-pm@localhost')),
 });
 
 export type LogLevel = z.infer<typeof envSchema>['LOG_LEVEL'];
@@ -60,16 +53,6 @@ export interface AppConfig {
     writeMode: WriteMode;
   };
   pipeline: { clientGateAutoApprove: boolean; placeholderDelayMs: number };
-  /** With no SMTP_HOST set, email goes to the local Mailpit inbox. */
-  smtp: {
-    host: string;
-    port: number;
-    user?: string;
-    password?: string;
-    secure: boolean;
-    from: string;
-    usingMailpit: boolean;
-  };
 }
 
 export class ConfigError extends Error {
@@ -101,15 +84,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     pipeline: {
       clientGateAutoApprove: e.CLIENT_GATE_AUTO_APPROVE,
       placeholderDelayMs: e.PIPELINE_PLACEHOLDER_DELAY_MS,
-    },
-    smtp: {
-      host: e.SMTP_HOST ?? e.MAILPIT_HOST,
-      port: e.SMTP_PORT,
-      user: e.SMTP_USER,
-      password: e.SMTP_PASSWORD,
-      secure: e.SMTP_SECURE,
-      from: e.NOTIFY_FROM,
-      usingMailpit: e.SMTP_HOST === undefined,
     },
   };
 }

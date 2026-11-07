@@ -16,24 +16,11 @@ describe('loadConfig', () => {
       ATLASSIAN_SITE_URL: '',
       ATLASSIAN_API_TOKEN: '  ',
       JIRA_BOARD_ID: '',
-      SMTP_HOST: '',
     });
     expect(config.atlassian.siteUrl).toBeUndefined();
     expect(config.atlassian.apiToken).toBeUndefined();
     expect(config.atlassian.jiraBoardId).toBeUndefined();
-    expect(config.smtp.usingMailpit).toBe(true);
     expect(atlassianCredentials(config)).toBeUndefined();
-  });
-
-  it('uses Mailpit unless an SMTP host is set', () => {
-    expect(loadConfig({ MAILPIT_HOST: 'mailpit' }).smtp).toMatchObject({
-      host: 'mailpit',
-      usingMailpit: true,
-    });
-    expect(loadConfig({ SMTP_HOST: 'smtp.example.com' }).smtp).toMatchObject({
-      host: 'smtp.example.com',
-      usingMailpit: false,
-    });
   });
 
   it('returns Atlassian credentials once all three values are present', () => {

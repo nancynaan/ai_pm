@@ -10,7 +10,6 @@ export interface ProbeDeps {
   claude: Pick<ClaudeCli, 'version' | 'authStatus'>;
   /** CLAUDE_CODE_OAUTH_TOKEN, only to check its format. */
   claudeToken?: string;
-  mailer: { verify(): Promise<unknown> };
 }
 
 const MISSING_ATLASSIAN = 'Set ATLASSIAN_SITE_URL, ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN in .env';
@@ -22,7 +21,6 @@ export function buildProbes({
   atlassian,
   claude,
   claudeToken,
-  mailer,
 }: ProbeDeps): HealthProbe[] {
   const { jiraProjectKey, jiraBoardId, confluenceSpaceKey } = config.atlassian;
   return [
@@ -108,15 +106,6 @@ export function buildProbes({
         return ok(
           `Claude Code ${version}, signed in (${status.authMethod}); agents use ${config.claude.model}`,
         );
-      },
-    },
-    {
-      name: 'smtp',
-      label: 'Email (SMTP)',
-      run: async () => {
-        await mailer.verify();
-        const where = `${config.smtp.host}:${config.smtp.port}`;
-        return ok(config.smtp.usingMailpit ? `Local Mailpit inbox at ${where}` : `SMTP server ${where}`);
       },
     },
   ];

@@ -14,7 +14,6 @@ const baseDeps = (overrides: Partial<ProbeDeps> = {}): ProbeDeps => ({
   config: loadConfig({ JIRA_PROJECT_KEY: 'ERG', CONFLUENCE_SPACE_KEY: 'ERG' }),
   query: async () => ({ rows: [{ n: 1 }] }),
   claude: claudeCli(false),
-  mailer: { verify: async () => true },
   ...overrides,
 });
 

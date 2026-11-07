@@ -3,7 +3,7 @@ type: stakeholder_register
 title: Stakeholder Register
 ---
 
-Everyone who affects or is affected by the project. Scrum Team members get email reminders before sprint events.
+Everyone who affects or is affected by the project. The last column marks the members of the Scrum Team.
 
 {{table:stakeholders}}
 

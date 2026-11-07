@@ -37,7 +37,6 @@ import { intakeStage } from './pipeline-engine/stages/intake.js';
 import { buildProbes } from './health/checks.js';
 import { createAtlassianGateway } from './integrations/atlassian/index.js';
 import { createClaudeCli } from './integrations/claude-cli.js';
-import { createMailer } from './integrations/mailer.js';
 import { drizzleSyncLog } from './sync/sync-log.js';
 
 function loggerOptions(config: AppConfig): FastifyServerOptions['logger'] {
@@ -64,7 +63,6 @@ async function main() {
     atlassian: credentials && createAtlassianGateway(credentials),
     claude,
     claudeToken: process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || undefined,
-    mailer: createMailer(config.smtp),
   });
 
   const repo = createRunRepository(db);
@@ -273,7 +271,6 @@ async function main() {
       atlassian: credentials ? config.atlassian.siteUrl : 'not configured',
       writeMode: config.atlassian.writeMode,
       claude: `${config.claude.cliPath} (${config.claude.model})`,
-      smtp: config.smtp.usingMailpit ? 'mailpit' : config.smtp.host,
     },
     `AI PM server ${pkg.version} ready at ${config.baseUrl}`,
   );

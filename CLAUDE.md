@@ -11,7 +11,7 @@ Folders with their own `CLAUDE.md` (loaded when you work there): `apps/server/sr
 - `apps/server`: Node.js 24 + TypeScript (Fastify, Drizzle/PostgreSQL).
   - `src/pipeline-engine`: the pipeline (state machine, engine, stages, discovery, assessment, calculators).
   - `src/agents`: runs agents through `claude -p` (`runner.ts`) and loads their definitions (`registry.ts`, `schemas.ts`).
-  - `src/integrations` (Atlassian REST, Claude CLI, SMTP), `src/render` (Markdown → Confluence storage and Jira ADF), `src/sync` (idempotent publisher, sync log), `src/baseline` (demo project seed and digest), `src/api` (REST + SSE), `src/evals` (eval and demo CLIs).
+  - `src/integrations` (Atlassian REST, Claude CLI), `src/render` (Markdown → Confluence storage and Jira ADF), `src/sync` (idempotent publisher, sync log), `src/baseline` (demo project seed and digest), `src/api` (REST + SSE), `src/evals` (eval and demo CLIs).
 - `apps/web`: React + Vite UI. `packages/shared`: zod schemas and types for server and web.
 - `seed/baseline`: the demo project (Comet Run): YAML data and Markdown pages. Numbers live only in the YAML.
 - `agents/`, `skills/`: the product's runtime AI roles and their knowledge. `config/`: YAML settings. `evals/features.yaml`: sample features with client answer profiles.
@@ -40,17 +40,17 @@ npm test                   # Vitest
 npm run typecheck          # tsc -b over all projects
 npm run lint               # ESLint
 npm run build              # shared → server → web
-npm run dev                # server + web (Vite :5173); needs: docker compose up -d postgres mailpit
+npm run dev                # server + web (Vite :5173); needs: docker compose up -d postgres
 npm run db:generate        # migration after editing apps/server/src/db/schema.ts
 npm run seed               # seed the demo project (dry-run; -- --live writes, -- --sync-only re-reads)
-docker compose up --build  # full stack: app :3000, Mailpit :8025, pgAdmin :5050
+docker compose up --build  # full stack: app :3000, pgAdmin :5050
 ```
 
 Slash commands: `/rebuild` (build, restart, health), `/eval` (in-memory eval, default `rewarded-menu-chest`), `/demo` (saved demo run through the API), `/phase` (start the next phase from the plan).
 
 ## Status
 
-Phases 0–7 are done (Phase 7: Approve/Decline only; after Approve the Epic and one story per story-map item go to Jira as an AI draft, the Initial Product Backlog gets the feature's block, and a Backlog tab appears). Next is Phase 8: sprint reminders (plus the PO notification email moved from Phase 7). One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).
+Phases 0–7 are done (Phase 7: Approve/Decline only; after Approve the Epic and one story per story-map item go to Jira as an AI draft, the Initial Product Backlog gets the feature's block, and a Backlog tab appears). Sprint reminders and all email were dropped by the user (2026-11-07); the next and last phase is Phase 8: hardening and demo. One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).
 
 ## Current Focus
 
@@ -59,7 +59,7 @@ Updated 2026-11-07. Read this before starting work in a new chat.
 ### Where we are
 
 - **Done and pushed:** Phases 0–6 and a separate UI commit (`5cf0dbd` Phase 5, `5383ecd` Phase 6, `71d3899` UI). **Phase 7** is done and verified, including a live Approve on the demo run; check `git log` for its commit.
-- **Next: Phase 8, reminders** (plan row 8 in `../docs/IMPLEMENTATION_PLAN.md`), including the PO notification email for an approved backlog. Run `/phase` and agree the plan with the user before writing code.
+- **Next: Phase 8, hardening and demo** (plan row 8 in `../docs/IMPLEMENTATION_PLAN.md`; the old reminders phase was dropped). Run `/phase` and agree the plan with the user before writing code.
 - **Write mode is live** (`ATLASSIAN_WRITE_MODE=live`, set by the user). Every publish writes to the real Confluence space `AIPMconf` and Jira project `AIPM`. Ask before any action that writes something new.
 - **Demo run** `4b5ea878-fb47-48da-859a-73e8c2a1530c` (rewarded-menu-chest, title "Add a free gift chest to the main menu"): verdict Go, documents published live as FA-1 (Feature Brief v3 "… (AIPM-28)" with the deck embedded and the approval, Requirements Specification, Estimation & Release Forecast, Roadmap Update Proposal, blocks on the Risk Register, Assumption Log and Initial Product Backlog), deck v1.1 attached to the Brief as `FA-1 Feature Proposal.pptx`. **Approved live on 2026-11-07 and `completed`:** Epic AIPM-28 with Stories AIPM-29…AIPM-41 in Jira as an AI draft. Its chat history is one block per step; keep it that way. Re-running its backlog stage would only update the same issues, but ask first: it writes to Jira.
 
@@ -80,7 +80,7 @@ Updated 2026-11-07. Read this before starting work in a new chat.
 - **Idempotent:** sync-log keys plus marker labels; a second run updates the same issues (an unchanged payload is skipped) and `Blocks` links are checked first. The Epic is created when intake left none.
 - **Coverage gate:** every requirement except Won't has a story; Jira keys are stored in `backlog_items` (no RTM).
 - **Confluence after Jira:** a block per feature on the Initial Product Backlog page; the documents are re-rendered (Epic key in the Brief title, Epic and backlog links, the approval).
-- **PO notification email:** moved to Phase 8.
+- **No email at all:** the PO notification email, the sprint reminders (former Phase 8, BPMN 07) and the Mailpit/SMTP plumbing were removed by the user's decision (2026-11-07).
 
 ### Open, not urgent
 

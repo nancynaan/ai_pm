@@ -7,11 +7,11 @@ An AI pipeline that does project-management work for a Scrum game project (an en
 3. estimates effort, release forecast, budget, business value/ROI and risks;
 4. publishes the PM documents to Confluence;
 5. shows the client a short presentation with charts;
-6. after approval, creates the Epic, user stories, acceptance criteria and dependencies in Jira for Product Owner review.
+6. after approval, creates the Epic, user stories, acceptance criteria and dependencies in Jira as a draft for Product Owner review.
 
-It also emails the team before sprint events. Everything runs locally with Docker Compose, and all data is kept in PostgreSQL.
+Everything runs locally with Docker Compose, and all data is kept in PostgreSQL.
 
-> **Status:** Phase 3 of 10. Intake, the questionnaire and the requirements and impact analysis run with real Claude agents; the later stages are still placeholders.
+> **Status:** Phases 0–7 of 9 are done: every stage, from intake to the backlog in Jira, runs with real Claude agents. Phase 8 (hardening and demo) is next.
 
 ## Prerequisites
 
@@ -47,9 +47,9 @@ It also emails the team before sprint events. Everything runs locally with Docke
    docker compose up --build -d
    ```
 
-3. Open <http://localhost:3000>. The status page checks PostgreSQL, Jira (sign-in and the Scrum project), Confluence, the Claude Code CLI login and email. "Not configured" means a value is missing in `.env`; the detail column says which.
+3. Open <http://localhost:3000>. The status page checks PostgreSQL, Jira (sign-in and the Scrum project), Confluence, and the Claude Code CLI login. "Not configured" means a value is missing in `.env`; the detail column says which.
 
-The JSON report is at <http://localhost:3000/api/health>. Emails sent by the app appear in Mailpit at <http://localhost:8025>.
+The JSON report is at <http://localhost:3000/api/health>.
 
 To explore the database, open pgAdmin at <http://localhost:5050>. It runs in desktop mode (no pgAdmin login, reachable only from this machine) and has the project database registered as **AI PM (local)**, connected with the user and password from `.env`. The pipeline's progress lives in `pipeline_runs` (current state), `stage_executions` (one row per stage attempt), `run_events` (the chat), `llm_calls`, `questionnaires` and `assessments`. Desktop clients such as DBeaver can connect to `127.0.0.1:5432` instead.
 
@@ -114,8 +114,8 @@ docker compose exec app node apps/server/dist/evals/cli.js --only ghost-race
 
 ```bash
 npm install
-docker compose up -d postgres mailpit   # database and mail inbox only
-npm run dev                             # API on :3000 (tsx watch), UI on :5173 (Vite)
+docker compose up -d postgres   # database only
+npm run dev                     # API on :3000 (tsx watch), UI on :5173 (Vite)
 ```
 
 | Command                           | What it does                                                                            |
@@ -148,6 +148,5 @@ The pipeline itself is in `apps/server/src/pipeline-engine`: `stages.ts` (states
 ## Configuration notes
 
 - **Database.** The app builds its connection from the `POSTGRES_*` values, so the password lives in one place. Inside Docker it reaches the `postgres` service; on your machine it uses `localhost:${POSTGRES_PORT}`.
-- **Email.** With `SMTP_HOST` empty, every email goes to Mailpit. Set your provider's host, port, user and password to send real email.
 - **Atlassian.** The pipeline talks to the Jira and Confluence REST APIs with Basic auth (email + API token). With `ATLASSIAN_WRITE_MODE=dry-run`, writes are logged but not sent.
 - **Claude.** Each agent call runs `claude -p` (print mode) with no tools enabled and a JSON schema for the answer. The Docker image ships its own pinned copy of Claude Code, signed in with `CLAUDE_CODE_OAUTH_TOKEN`. When you run the server on your machine (`npm run dev`), it uses your existing Claude Code login; set `CLAUDE_CLI_PATH` if `claude` is not on your PATH.

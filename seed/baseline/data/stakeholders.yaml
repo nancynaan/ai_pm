@@ -1,5 +1,5 @@
 # Stakeholder Register. Emails use the reserved example.com domain; "team: true" marks the
-# Scrum Team members who receive sprint event reminders.
+# Scrum Team members.
 stakeholders:
   - {
       name: Olivia Grant,

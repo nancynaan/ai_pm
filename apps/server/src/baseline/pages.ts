@@ -133,7 +133,7 @@ function tables(seed: SeedData, ctx: PageContext): Record<string, () => string> 
         { header: 'Influence', value: (s) => s.influence },
         { header: 'Engagement', value: (s) => s.engagement },
         { header: 'Email', value: (s) => s.email },
-        { header: 'Sprint reminders', value: (s) => (s.team ? 'Yes' : '–') },
+        { header: 'Scrum Team', value: (s) => (s.team ? 'Yes' : '–') },
       ]),
     assumptions: () =>
       markdownTable(seed.assumptions.assumptions, [

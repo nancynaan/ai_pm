@@ -2,6 +2,7 @@
 // ESLint on the changed files, and the tests. On a failure, exit 2 so Claude gets the output and
 // fixes it before finishing. It runs once per stop (stop_hook_active prevents a loop).
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
@@ -27,7 +28,9 @@ const changed = git.stdout
   .split('\n')
   .map((line) => line.slice(3).trim().replace(/^"|"$/g, ''))
   .map((path) => (path.includes(' -> ') ? path.split(' -> ')[1] : path))
-  .filter((path) => /^(apps|packages)\/.*\.(ts|tsx)$/.test(path));
+  .filter((path) => /^(apps|packages)\/.*\.(ts|tsx)$/.test(path))
+  // A deleted file is still in the status list, but ESLint fails on a path that does not exist.
+  .filter((path) => existsSync(join(root, path)));
 if (!changed.length) process.exit(0);
 
 const run = (label, args) => {
