@@ -4,6 +4,7 @@ import {
   questionnaireSchema,
   type RunEvent,
   runEventSchema,
+  type RunLog,
   type RunState,
   type RunSummary,
   type StoredRunEvent,
@@ -366,6 +367,49 @@ export function createRunRepository(db: Db) {
 
     async recordCall(runId: string | null, stageExecutionId: string | null, call: CallRecord) {
       await db.insert(llmCalls).values({ runId, stageExecutionId, ...call });
+    },
+
+    /** The Run log: stage attempts in order with their Claude calls (numbers only, no prompt text). */
+    async runLog(runId: string): Promise<RunLog> {
+      const [stages, calls] = await Promise.all([
+        db
+          .select()
+          .from(stageExecutions)
+          .where(eq(stageExecutions.runId, runId))
+          .orderBy(asc(stageExecutions.startedAt)),
+        db.select().from(llmCalls).where(eq(llmCalls.runId, runId)).orderBy(asc(llmCalls.createdAt)),
+      ]);
+      const toCall = (c: (typeof calls)[number]) => ({
+        agent: c.agent,
+        status: c.status,
+        inputTokens: c.inputTokens,
+        outputTokens: c.outputTokens,
+        durationMs: c.durationMs,
+        error: c.error,
+      });
+      const count = (status: string) => calls.filter((c) => c.status === status).length;
+      return {
+        runId,
+        stages: stages.map((s) => ({
+          stage: s.stage,
+          attempt: s.attempt,
+          status: s.status,
+          startedAt: s.startedAt.toISOString(),
+          finishedAt: s.finishedAt?.toISOString() ?? null,
+          durationMs: s.finishedAt ? s.finishedAt.getTime() - s.startedAt.getTime() : null,
+          error: s.error,
+          calls: calls.filter((c) => c.stageExecutionId === s.id).map(toCall),
+        })),
+        totals: {
+          calls: calls.length,
+          repairs: count('invalid_output'),
+          limitPauses: count('limit_reached'),
+          errors: count('error'),
+          inputTokens: calls.reduce((n, c) => n + (c.inputTokens ?? 0), 0),
+          outputTokens: calls.reduce((n, c) => n + (c.outputTokens ?? 0), 0),
+          callMs: calls.reduce((n, c) => n + (c.durationMs ?? 0), 0),
+        },
+      };
     },
 
     async summary(run: RunRecord): Promise<RunSummary> {

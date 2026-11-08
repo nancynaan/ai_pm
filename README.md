@@ -11,7 +11,7 @@ An AI pipeline that does project-management work for a Scrum game project (an en
 
 Everything runs locally with Docker Compose, and all data is kept in PostgreSQL.
 
-> **Status:** Phases 0–7 of 9 are done: every stage, from intake to the backlog in Jira, runs with real Claude agents. Phase 8 (hardening and demo) is next.
+> **Status:** all phases are done (0–8). Every stage, from intake to the backlog in Jira, runs with real Claude agents; CI runs the whole pipeline end to end on recorded Claude answers. To walk through it as the client, follow the [demo script](DEMO.md).
 
 ## Prerequisites
 
@@ -91,9 +91,19 @@ The status page lists the baseline documents with links to Confluence.
 
 ## Using the chat
 
-Open <http://localhost:3000>, describe a feature as the client and send it. The AI PM asks a short questionnaire, shows progress through the stages, and asks for your decision (approve, request changes or decline). Runs survive restarts: a stage that was cut off is retried when the app comes back. **System status** is the second tab.
+Open <http://localhost:3000>, describe a feature as the client and send it. The AI PM:
 
-With `ATLASSIAN_WRITE_MODE=live`, intake also creates a draft Epic in Jira (labels `ai-pm`, `ai-pm-draft`). One assessment takes a few minutes and uses your Claude subscription (several Opus calls).
+1. asks a discovery questionnaire (and a clarification round if something is unclear or contradictory);
+2. analyzes and assesses the feature; the figures and charts are on the **Analysis** tab;
+3. waits for you to press **Generate and publish to Confluence** on the Documents card;
+4. shows a three-slide proposal (**Presentation** tab, PPTX attached to the Feature Brief);
+5. asks for your decision: **Approve** or **Decline**.
+
+On Approve, the Epic and one story per story-map item go to Jira as an AI draft for the Product Owner: To Do, label `ai-draft`, no sprint, Story Points empty, a proposed priority and an `AI estimate (SP)`. The Initial Product Backlog page gets the feature's block, and a **Backlog** tab appears. On Decline, the decision is recorded on the Feature Brief and the Assumption Log and the draft Epic is closed. Either way the conversation then closes.
+
+Runs survive restarts: a stage that was cut off is retried when the app comes back, and a Claude usage limit pauses the run until it resets. With `ATLASSIAN_WRITE_MODE=live`, intake also creates a draft Epic in Jira (labels `ai-pm`, `ai-pm-draft`). One feature takes about 15–20 minutes of Claude time in total and roughly 10–12 Opus calls on your subscription.
+
+**System status** (the button on the home page) shows the health checks, the project baseline, and the **Run log**: each feature's steps with their duration, outcome and Claude calls (tokens, repairs, usage-limit pauses), from `stage_executions` and `llm_calls`.
 
 To check that Claude works through your subscription, make one small real call:
 
@@ -103,12 +113,33 @@ docker compose exec app node apps/server/dist/agents/smoke-cli.js
 
 ## Evals
 
-[evals/features.yaml](evals/features.yaml) holds sample feature requests with the change magnitude a good analysis should reach (UI-only, feature extension, core engine). The eval runs each one through the real intake, elicitation and analysis stages, without writing to Jira:
+[evals/features.yaml](evals/features.yaml) holds sample feature requests with a client answer profile and what a good result looks like (change magnitude, discovery result, verdict). The eval runs each one through the real stages up to the backlog builder, writes nothing to Jira or Confluence, and grades the result in code: magnitude, discovery, verdict, the document validator (every figure matches the assessment), requirement coverage by stories (100 %) and an INVEST lint of the stories. There is no LLM judge.
 
 ```bash
-docker compose exec app node apps/server/dist/evals/cli.js            # all features (about 30 minutes)
-docker compose exec app node apps/server/dist/evals/cli.js --only ghost-race
+docker compose exec app node apps/server/dist/evals/cli.js --only rewarded-menu-chest   # ~11 Claude calls
+docker compose exec app node apps/server/dist/evals/cli.js --only rewarded-menu-chest --record
+docker compose exec app node apps/server/dist/evals/cli.js --only rewarded-menu-chest --replay
 ```
+
+`--record` keeps Claude's answers in `evals/cassettes/eval-<feature>.json` (only answers not recorded yet are fetched); `--replay` re-runs the stages and graders on them with no Claude call. Cheaper checks of one agent on a saved run: `apps/server/dist/evals/writer-cli.js --run <id>` (pm-writer, `--presenter` for the presenter) and `apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder and a dry-run of the Jira write).
+
+## Testing and CI
+
+- `npm test` runs the unit tests and, when `E2E_DATABASE_URL` points at a Postgres server, the **end-to-end test** ([apps/server/src/e2e](apps/server/src/e2e)): the whole pipeline as the app wires it, played by the client from `evals/features.yaml`, with Claude's answers replayed from [evals/cassettes/rewarded-menu-chest.json](evals/cassettes) and a fake read-only Atlassian site. One run is approved (documents, deck and an AI-draft backlog planned in dry-run, every requirement covered, INVEST lint clean, one chat block per step), a second is declined; nothing is written and no Claude call is made. It creates and drops its own database.
+
+  ```bash
+  docker run -d --rm --name aipm-e2e-pg -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e -p 55432:5432 postgres:17-alpine
+  E2E_DATABASE_URL=postgres://e2e:e2e@localhost:55432/postgres npm test
+  ```
+
+  After a change to prompts or stages, re-record the cassette (delete it first, then `E2E_RECORD=1`; Claude runs inside the app container, about 11 calls).
+
+- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint, typecheck, the tests with the end-to-end test against a Postgres service, the build and a Docker build on every push and pull request to `main`. It needs no secrets: it never talks to Atlassian or Claude.
+- **Live smoke test**, read only, against your real site: the health checks, the baseline pages, and a dry-run of every published feature that reports what a re-publish would change in Confluence and Jira. Nothing is written and no Claude call is made.
+
+  ```bash
+  docker compose exec app node apps/server/dist/evals/smoke-cli.js
+  ```
 
 ## Development
 
@@ -120,7 +151,8 @@ npm run dev                     # API on :3000 (tsx watch), UI on :5173 (Vite)
 
 | Command                           | What it does                                                                            |
 | --------------------------------- | --------------------------------------------------------------------------------------- |
-| `npm test`                        | Unit tests (Vitest)                                                                     |
+| `npm test`                        | Unit tests (Vitest), plus the end-to-end test when `E2E_DATABASE_URL` is set            |
+| `npm run smoke`                   | The read-only live smoke test from your machine                                         |
 | `npm run typecheck`               | TypeScript across all workspaces                                                        |
 | `npm run lint` / `npm run format` | ESLint / Prettier                                                                       |
 | `npm run build`                   | Build shared, server and web                                                            |
@@ -138,7 +170,9 @@ agents/           agent definitions (one Markdown file per role)
 skills/           knowledge packages used by the agents
 config/           YAML settings: discovery questionnaire, feasibility rules
 seed/baseline/    the demo project's baseline: data (YAML) and page texts (Markdown)
-evals/            sample feature requests with client answer profiles
+evals/            sample feature requests with client answer profiles; cassettes/ holds recorded
+                  Claude answers for the end-to-end test and `--replay` evals
+.github/          CI workflow (lint, typecheck, tests with the end-to-end test, build, Docker build)
 .claude/          Claude Code development harness: permissions, hooks (session status, format on edit,
                   quality gate) and slash commands (/rebuild, /eval, /demo, /phase)
 ```
@@ -150,3 +184,12 @@ The pipeline itself is in `apps/server/src/pipeline-engine`: `stages.ts` (states
 - **Database.** The app builds its connection from the `POSTGRES_*` values, so the password lives in one place. Inside Docker it reaches the `postgres` service; on your machine it uses `localhost:${POSTGRES_PORT}`.
 - **Atlassian.** The pipeline talks to the Jira and Confluence REST APIs with Basic auth (email + API token). With `ATLASSIAN_WRITE_MODE=dry-run`, writes are logged but not sent.
 - **Claude.** Each agent call runs `claude -p` (print mode) with no tools enabled and a JSON schema for the answer. The Docker image ships its own pinned copy of Claude Code, signed in with `CLAUDE_CODE_OAUTH_TOKEN`. When you run the server on your machine (`npm run dev`), it uses your existing Claude Code login; set `CLAUDE_CLI_PATH` if `claude` is not on your PATH.
+
+## Security
+
+- **Secrets** live only in `.env`, which is git-ignored, docker-ignored and never baked into the image. The logs redact the auth header, cookies, the Atlassian and Claude tokens, the database password and URL; prompts and answers are never logged (the Run log shows numbers only). The app container runs as the unprivileged `node` user.
+- **Agents have no tools and no side effects**: every call runs with `--tools ""` and returns JSON that is validated with zod. Only the pipeline engine writes, through the idempotent publisher; in dry-run the Atlassian gateway also refuses every write.
+- **Client text is data.** The client's request, answer details and comments reach the agents only inside `<client_request>` / `<client_text>` tags, and every agent's system prompt says to treat them as data, never as instructions. Numbers never come from the agents: code computes every estimate, date, budget and verdict.
+- **Rendering.** Markdown in the UI is rendered as React elements (no raw HTML); chat links are `https://` only; Confluence storage and Jira ADF escape all text.
+- **No authentication.** The app is meant for one person on a local machine: the API and UI have no login, so do not expose port 3000 beyond `localhost`.
+- **Dependencies.** `npm audit --omit=dev` reports `image-size` (a denial of service on crafted JXL/HEIF/ICNS images) inside `pptxgenjs`. The deck adds no images from clients, so it cannot be reached; the suggested fix is a major-version change of `pptxgenjs`.

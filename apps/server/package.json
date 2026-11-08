@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=../../.env src/db/migrate-cli.ts",
-    "seed": "tsx --env-file-if-exists=../../.env src/baseline/cli.ts"
+    "seed": "tsx --env-file-if-exists=../../.env src/baseline/cli.ts",
+    "smoke": "tsx --env-file-if-exists=../../.env src/evals/smoke-cli.ts"
   },
   "dependencies": {
     "@ai-pm/shared": "^0.1.0",

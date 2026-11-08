@@ -4,7 +4,7 @@ import { classifyChange, MAGNITUDE_LABEL } from '../magnitude.js';
 import type { DiscoveryOutput } from './eliciting.js';
 import type { StageHandler } from '../engine.js';
 import type { StageServices } from '../services.js';
-import { clientRequest, section, transcript } from './prompts.js';
+import { clientRequest, clientText, section, transcript } from './prompts.js';
 
 const BASELINE_FOR_REQUIREMENTS = ['game_design_document', 'definition_of_done', 'product_roadmap'];
 const BASELINE_FOR_IMPACT = ['architecture_overview', 'game_design_document'];
@@ -41,7 +41,7 @@ export function analyzingStage(services: StageServices): StageHandler {
         ? [
             section(
               'Assessment basis',
-              `PRELIMINARY. Discovery is incomplete${discoveryDecision?.decision === 'proceed' ? ' and the client accepted a preliminary assessment' : ''}${discoveryDecision?.comment ? ` (client comment: ${discoveryDecision.comment})` : ''}. Record every open point as an assumption.`,
+              `PRELIMINARY. Discovery is incomplete${discoveryDecision?.decision === 'proceed' ? ' and the client accepted a preliminary assessment' : ''}${discoveryDecision?.comment ? ` (client comment: ${clientText(discoveryDecision.comment)})` : ''}. Record every open point as an assumption.`,
             ),
           ]
         : []),

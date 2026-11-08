@@ -169,6 +169,15 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
     }),
   );
 
+  /** The Run log on the System status page: stage attempts and Claude calls (numbers only). */
+  app.get('/api/runs/:id/log', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      if (!(await repo.getRun(id))) throw new RunActionError('Run not found', 404);
+      return repo.runLog(id);
+    }),
+  );
+
   /** The slide viewer: the deck and where its PPTX is attached. */
   app.get('/api/runs/:id/presentation', async (request, reply) =>
     handle(reply, async (): Promise<Presentation> => {

@@ -70,6 +70,7 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
   const maxAttempts = opts.maxAttempts ?? 3;
   const retryDelaySeconds = opts.retryDelaySeconds ?? 10;
   const limitPauseSeconds = opts.limitPauseSeconds ?? 15 * 60;
+  const busyRetrySeconds = 2;
 
   /** Session-level advisory lock: released automatically if the process dies. */
   async function withRunLock<T>(
@@ -156,8 +157,13 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
         }
       }
     });
-    // Another worker holds the run; it will move the run on itself.
-    if (!result.locked) log.info({ runId: job.runId, state: job.state }, 'run busy, job skipped');
+    // The lock is held: by another worker on this stage, or by the action or stage that just
+    // enqueued this job and has not released the lock yet. Try again shortly; once the run has
+    // moved on, the job is stale and does nothing. (Skipping it could leave the run stuck.)
+    if (!result.locked) {
+      log.info({ runId: job.runId, state: job.state }, 'run busy, job retried shortly');
+      await queue.enqueue(job, busyRetrySeconds);
+    }
   }
 
   /** Client actions run under the same lock, so a double click cannot apply twice. */

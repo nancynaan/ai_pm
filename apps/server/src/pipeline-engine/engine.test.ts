@@ -306,16 +306,20 @@ describe('pipeline engine', () => {
     expect(h.executions.map((e) => e.status)).toEqual(['paused']);
   });
 
-  it('ignores stale jobs and jobs for a run another worker holds', async () => {
+  it('ignores stale jobs and retries jobs for a run whose lock is held', async () => {
     let free = true;
     const h = setupEngine(placeholderStages({ delayMs: 0, autoApprove: true }), { lockFree: () => free });
     const run = await h.pipelineEngine.createRun('Duplicate jobs');
+    h.jobs.length = 0;
     await h.pipelineEngine.executeStage({ runId: run.id, state: 'analyzing' }); // stale
     expect(h.executions).toHaveLength(0);
+    expect(h.jobs).toHaveLength(0);
 
+    // Locked (another worker, or the action that enqueued the job): tried again shortly, not lost.
     free = false;
-    await h.pipelineEngine.executeStage({ runId: run.id, state: 'intake' }); // locked elsewhere
+    await h.pipelineEngine.executeStage({ runId: run.id, state: 'intake' });
     expect(h.executions).toHaveLength(0);
+    expect(h.jobs).toEqual([{ job: { runId: run.id, state: 'intake' }, delay: 2 }]);
     await expect(h.pipelineEngine.retry(run.id)).rejects.toMatchObject({ status: 409 });
   });
 });

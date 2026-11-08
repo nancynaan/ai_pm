@@ -10,13 +10,11 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import {
   type Assessment,
   assessmentSchema,
-  NOT_SURE,
-  type Questionnaire,
   type RunSummary,
   runSummarySchema,
 } from '@ai-pm/shared';
 import { z } from 'zod';
-import { type EvalFeature, loadEvalFeatures, onlyArg } from './features.js';
+import { answersFor, type EvalFeature, loadEvalFeatures, onlyArg } from './features.js';
 
 const BASE_URL = process.env.DEMO_BASE_URL ?? `http://localhost:${process.env.APP_PORT ?? 3000}`;
 const TIMEOUT_MS = 40 * 60_000;
@@ -31,21 +29,6 @@ async function call<T>(path: string, schema: z.ZodType<T>, body?: unknown): Prom
   const text = await response.text();
   if (!response.ok) throw new Error(`${path}: ${response.status} ${text.slice(0, 300)}`);
   return schema.parse(JSON.parse(text));
-}
-
-/** The client's answers to one questionnaire, like the eval's client. */
-function answersFor(q: Questionnaire, feature: EvalFeature) {
-  const answers = Object.fromEntries(
-    q.questions.map((question) => [
-      question.id,
-      feature.answers[question.id] ?? [question.options.find((o) => o.value !== NOT_SURE)!.value],
-    ]),
-  );
-  const ids = new Set(q.questions.map((x) => x.id));
-  const details = Object.fromEntries(
-    Object.entries(feature.details ?? {}).filter(([key]) => ids.has(key.split(':')[0]!)),
-  );
-  return { questionnaireId: q.id, answers, details };
 }
 
 async function demo(feature: EvalFeature): Promise<{ run: RunSummary; assessment: Assessment | null }> {

@@ -36,7 +36,8 @@ Folders with their own `CLAUDE.md` (loaded when you work there): `apps/server/sr
 ## Commands
 
 ```bash
-npm test                   # Vitest
+npm test                   # Vitest (+ the e2e test when E2E_DATABASE_URL is set)
+npm run smoke              # read-only live check of Jira/Confluence (also: docker compose exec app node apps/server/dist/evals/smoke-cli.js)
 npm run typecheck          # tsc -b over all projects
 npm run lint               # ESLint
 npm run build              # shared → server → web
@@ -50,16 +51,17 @@ Slash commands: `/rebuild` (build, restart, health), `/eval` (in-memory eval, de
 
 ## Status
 
-Phases 0–7 are done (Phase 7: Approve/Decline only; after Approve the Epic and one story per story-map item go to Jira as an AI draft, the Initial Product Backlog gets the feature's block, and a Backlog tab appears). Sprint reminders and all email were dropped by the user (2026-11-07); the next and last phase is Phase 8: hardening and demo. One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~7 Claude calls and 150–230k tokens).
+All phases are done (0–8). Phase 8 (hardening and demo): record/replay of Claude answers (`agents/cassette.ts`, `evals/cassettes/`), an end-to-end test of the whole pipeline in dry-run (`src/e2e`, approve and decline, real Postgres, fake read-only Atlassian), eval v2 graders in code (`evals/graders.ts`: requirement coverage, INVEST lint) with `--record`/`--replay`, the read-only live smoke test (`evals/smoke-cli.ts`), the Run log on System status, client text fenced for every agent (`CLIENT_TEXT_RULE`), wider log redaction, a fix for jobs dropped while the run lock was held, GitHub Actions CI, the README and `DEMO.md`. The wiring of every stage lives in `src/pipeline.ts` (`createPipeline`). One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~10 Claude calls and ~400k tokens, the backlog builder included).
 
 ## Current Focus
 
-Updated 2026-11-07. Read this before starting work in a new chat.
+Updated 2026-11-08. Read this before starting work in a new chat.
 
 ### Where we are
 
-- **Done and pushed:** Phases 0–6 and a separate UI commit (`5cf0dbd` Phase 5, `5383ecd` Phase 6, `71d3899` UI). **Phase 7** is done and verified, including a live Approve on the demo run; check `git log` for its commit.
-- **Next: Phase 8, hardening and demo** (plan row 8 in `../docs/IMPLEMENTATION_PLAN.md`; the old reminders phase was dropped). Run `/phase` and agree the plan with the user before writing code.
+- **Done:** every phase (0–8); check `git log` for the Phase 8 commit. No further phase is planned.
+- **Next:** the user tests the pipeline live by hand, acting as the client ([DEMO.md](DEMO.md)); they chose to do that themselves rather than have it scripted. Help with what they find; ask before anything that writes to Atlassian.
+- **CI** (`.github/workflows/ci.yml`) runs lint, typecheck, tests with the e2e replay against a Postgres service, the build and a Docker build. A change that adds or reorders agent calls breaks the e2e replay: re-record `evals/cassettes/rewarded-menu-chest.json` (delete it, then `E2E_RECORD=1` with `E2E_DATABASE_URL`; Claude runs inside the app container, ~11 calls). Locally: `docker run -d --rm --name aipm-e2e-pg -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e -p 55432:5432 postgres:17-alpine`.
 - **Write mode is live** (`ATLASSIAN_WRITE_MODE=live`, set by the user). Every publish writes to the real Confluence space `AIPMconf` and Jira project `AIPM`. Ask before any action that writes something new.
 - **Demo run** `4b5ea878-fb47-48da-859a-73e8c2a1530c` (rewarded-menu-chest, title "Add a free gift chest to the main menu"): verdict Go, documents published live as FA-1 (Feature Brief v3 "… (AIPM-28)" with the deck embedded and the approval, Requirements Specification, Estimation & Release Forecast, Roadmap Update Proposal, blocks on the Risk Register, Assumption Log and Initial Product Backlog), deck v1.1 attached to the Brief as `FA-1 Feature Proposal.pptx`. **Approved live on 2026-11-07 and `completed`:** Epic AIPM-28 with Stories AIPM-29…AIPM-41 in Jira as an AI draft. Its chat history is one block per step; keep it that way. Re-running its backlog stage would only update the same issues, but ask first: it writes to Jira.
 
@@ -82,9 +84,19 @@ Updated 2026-11-07. Read this before starting work in a new chat.
 - **Confluence after Jira:** a block per feature on the Initial Product Backlog page; the documents are re-rendered (Epic key in the Brief title, Epic and backlog links, the approval).
 - **No email at all:** the PO notification email, the sprint reminders (former Phase 8, BPMN 07) and the Mailpit/SMTP plumbing were removed by the user's decision (2026-11-07).
 
+### Decisions made in Phase 8
+
+- **No scripted live demo:** the user runs the live demo by hand as the client; `DEMO.md` is their script. The smoke test is read only.
+- **Evals:** graders in code only, no LLM judge (keeps Claude calls low). The e2e cassette is the one recording CI needs; record eval cassettes only on request.
+- **Run log** on the System status page (numbers only: steps, time, calls, tokens, repairs, pauses), from `GET /api/runs/:id/log`.
+- **CI** on push and pull requests to `main`; it never talks to Atlassian or Claude and needs no secrets.
+
 ### Open, not urgent
 
-- The full eval was not re-run after Phases 5–6 or the elicitation `title` change.
+- Eval v2 on 2026-11-08: rewarded-menu-chest gave Go with conditions (a roadmap conflict) instead of Go; every other grader passed. The eval reads the live Jira backlog, which now holds the approved chest Epic AIPM-28; the e2e recording against the seed backlog gave Go. Likely a fair call, not a regression; re-run only if prompts change again.
+
+- `npm audit --omit=dev`: `image-size` (high, DoS on crafted images) inside `pptxgenjs`; not reachable (the deck adds no client images), the fix is a major version change. Documented in the README.
+- The Epic of FA-1 (AIPM-28) would get one update on a re-run: its description lists the documents by title, and the Brief was renamed "… (AIPM-28)" after the Epic was written. Harmless; the smoke test shows it as one WARN.
 
 ### Working notes
 

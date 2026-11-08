@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { ClaudeCli } from '../integrations/claude-cli.js';
+import type { Cassette } from './cassette.js';
 
 /**
  * Runs one agent call through `claude -p` on the user's Claude subscription: system prompt from a
@@ -95,6 +96,8 @@ export interface AgentRunnerOptions {
   record?: (call: CallRecord) => Promise<void>;
   maxRepairs?: number;
   timeoutMs?: number;
+  /** Record/replay of Claude answers (tests, CI, evals); without it every call goes to the CLI. */
+  cassette?: Pick<Cassette, 'play'>;
 }
 
 export function createAgentRunner({
@@ -102,6 +105,7 @@ export function createAgentRunner({
   record,
   maxRepairs = 2,
   timeoutMs = 10 * 60_000,
+  cassette,
 }: AgentRunnerOptions) {
   async function callOnce<T>(
     spec: AgentSpec<T>,
@@ -124,14 +128,11 @@ export function createAgentRunner({
       '',
       '--no-session-persistence',
     ];
+    const promptHash = createHash('sha256').update(spec.systemPrompt).update(prompt).digest('hex');
     const started = Date.now();
-    const { stdout, stderr } = await claude.print(args, prompt, timeoutMs);
-    const base = {
-      agent: spec.name,
-      model: spec.model,
-      promptHash: createHash('sha256').update(spec.systemPrompt).update(prompt).digest('hex'),
-      durationMs: Date.now() - started,
-    };
+    const print = () => claude.print(args, prompt, timeoutMs);
+    const { stdout, stderr } = cassette ? await cassette.play(spec.name, promptHash, print) : await print();
+    const base = { agent: spec.name, model: spec.model, promptHash, durationMs: Date.now() - started };
 
     let envelope: Envelope;
     try {

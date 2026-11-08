@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { discoveryResultSchema } from '@ai-pm/shared';
+import { type Answers, discoveryResultSchema, NOT_SURE, type Questionnaire } from '@ai-pm/shared';
 import { parse } from 'yaml';
 import { z } from 'zod';
 
@@ -38,4 +38,22 @@ export function onlyArg(args: string[]): Set<string> | null {
   const only =
     args.find((a) => a.startsWith('--only='))?.slice(7) ?? (flag >= 0 ? args[flag + 1] : undefined);
   return only ? new Set(only.split(',')) : null;
+}
+
+/**
+ * The client's answers to one questionnaire, like the eval's client: core questions from the
+ * feature's profile, feature-specific and clarification questions with their first definite option.
+ */
+export function answersFor(q: Questionnaire, feature: EvalFeature): Answers {
+  const answers = Object.fromEntries(
+    q.questions.map((question) => [
+      question.id,
+      feature.answers[question.id] ?? [question.options.find((o) => o.value !== NOT_SURE)!.value],
+    ]),
+  );
+  const ids = new Set(q.questions.map((x) => x.id));
+  const details = Object.fromEntries(
+    Object.entries(feature.details ?? {}).filter(([key]) => ids.has(key.split(':')[0]!)),
+  );
+  return { questionnaireId: q.id, answers, details };
 }

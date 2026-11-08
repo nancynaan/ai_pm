@@ -278,6 +278,19 @@ summary {
   color: var(--muted);
 }
 
+/* The Run log: one row per feature, opened for its steps. */
+.run-log details {
+  margin-top: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.run-log summary {
+  color: var(--text);
+}
+.run-log details table {
+  margin-top: 8px;
+}
+
 pre {
   margin: 8px 0 0;
   padding: 12px;

@@ -1,13 +1,28 @@
-// Eval set v2: runs each sample feature through the real intake, discovery, analysis and assessment stages
-// and the document writer (real Claude calls, real baseline and Jira backlog, no Jira or Confluence
-// writes) and checks the outcome, including the document validator.
+// Eval set v2: runs each sample feature through the real intake, discovery, analysis and assessment
+// stages, the document writer and the backlog builder (real baseline and Jira backlog, no Jira or
+// Confluence writes) and grades the outcome in code: change magnitude, discovery result, verdict,
+// the document validator (every figure matches the assessment), requirement coverage by stories
+// and an INVEST lint of the stories.
 //
 //   docker compose exec app node apps/server/dist/evals/cli.js [--only ghost-race,cloud-save]
+//     [--record | --replay]   keep Claude's answers in evals/cassettes/eval-<feature>.json:
+//                             --record calls Claude only for answers not recorded yet,
+//                             --replay makes no Claude call at all (the stages and graders still run).
 import { randomUUID } from 'node:crypto';
 import { type Assessment, NOT_SURE, type Questionnaire, type RunEvent, type RunState } from '@ai-pm/shared';
 import { loadAgentDefinitions } from '../agents/registry.js';
+import { fileURLToPath } from 'node:url';
+import { type Cassette, createCassette } from '../agents/cassette.js';
 import { createAgentRunner, type CallRecord } from '../agents/runner.js';
-import { AGENT_SCHEMAS, type DocumentDraft } from '../agents/schemas.js';
+import { AGENT_SCHEMAS, type BacklogDraft, type DocumentDraft } from '../agents/schemas.js';
+import {
+  type BacklogInputs,
+  buildBacklogPlan,
+  builderPrompt,
+  checkBacklogDraft,
+  coverageGaps,
+} from '../pipeline-engine/backlog/plan.js';
+import { investProblems, uncoveredRequirements } from './graders.js';
 import type { SeedData } from '../baseline/seed-data.js';
 import { needsRoadmapProposal } from '../pipeline-engine/calculators/baseline.js';
 import { buildFigures } from '../pipeline-engine/documents/figures.js';
@@ -52,6 +67,10 @@ interface Result {
   /** The documents' validator found nothing (writer draft and rendered result). */
   documentsOk: boolean;
   documentProblems: string[];
+  /** Every in-scope requirement has a story, and the stories pass the INVEST lint. */
+  backlogOk: boolean;
+  backlogProblems: string[];
+  stories: number;
   questions: number[];
   requirements: number;
   calls: number;
@@ -172,12 +191,17 @@ async function main() {
     atlassian: credentials && createAtlassianGateway(credentials, { readOnly: true }),
     jiraProjectKey: config.atlassian.jiraProjectKey,
   });
-  const ask = createAgentAsker({
-    runner: createAgentRunner({ claude: createClaudeCli({ cliPath: config.claude.cliPath }) }),
-    definitions: loadAgentDefinitions(),
-    schemas: AGENT_SCHEMAS,
-    defaultModel: config.claude.model,
-  });
+  const args = process.argv.slice(2);
+  const cassetteMode = args.includes('--replay') ? 'replay' : args.includes('--record') ? 'record' : null;
+  const claude = createClaudeCli({ cliPath: config.claude.cliPath });
+  const definitions = loadAgentDefinitions();
+  const cassetteFor = (id: string) =>
+    cassetteMode
+      ? createCassette({
+          file: fileURLToPath(new URL(`../../../../evals/cassettes/eval-${id}.json`, import.meta.url)),
+          mode: cassetteMode,
+        })
+      : undefined;
   const discovery = loadDiscoveryConfig();
   const assessment = loadAssessmentConfig();
   const templates = loadTemplates();
@@ -192,6 +216,7 @@ async function main() {
     for (const feature of features.filter((f) => !wanted || wanted.has(f.id))) {
       const started = Date.now();
       const calls: CallRecord[] = [];
+      const cassette: Cassette | undefined = cassetteFor(feature.id);
       const run: RunRecord = {
         id: randomUUID(),
         state: 'intake',
@@ -212,6 +237,12 @@ async function main() {
         baselineDigest: project.baselineDigest,
         emit: async (e) => void events.push(e),
       };
+      const ask = createAgentAsker({
+        runner: createAgentRunner({ claude, cassette }),
+        definitions,
+        schemas: AGENT_SCHEMAS,
+        defaultModel: config.claude.model,
+      });
       const services: StageServices = {
         ask,
         createDraftEpic: async () => ({ key: null, url: null, note: '(eval: no Epic)' }),
@@ -296,6 +327,31 @@ async function main() {
           assumptionLog: null,
         });
         const documentProblems = [...checkDraft(draft, checks), ...checkRendered(documents, inputs)];
+
+        // Stage 06 without Jira: one backlog-builder call, then coverage and the INVEST lint.
+        const backlogInputs: BacklogInputs = {
+          docs: inputs,
+          specification: draft.requirements,
+          existingBacklog: await context.backlog(),
+          documents: [],
+          briefUrl: null,
+        };
+        const items = assessed.storyMap.items;
+        const backlogDraft = await ask<BacklogDraft>(ctx, 'backlog-builder', builderPrompt(backlogInputs), {
+          check: (d) => checkBacklogDraft(d, items),
+        });
+        const plan = buildBacklogPlan(backlogInputs, backlogDraft, buildFigures(inputs));
+        const uncovered = [
+          ...new Set([
+            ...coverageGaps(backlogInputs),
+            ...uncoveredRequirements(inputs.analysis.requirements, plan.stories),
+          ]),
+        ];
+        const backlogProblems = [
+          ...uncovered.map((code) => `Coverage: no story covers ${code}`),
+          ...checkBacklogDraft(backlogDraft, items),
+          ...investProblems(backlogDraft, plan.stories),
+        ];
         const expectPreliminary = feature.assessment?.preliminary;
         const discoveryResults = reports().map((r) => r.result);
         const result: Result = {
@@ -313,6 +369,9 @@ async function main() {
           costP85: assessed.budget.total.p85,
           documentsOk: documentProblems.length === 0,
           documentProblems,
+          backlogOk: backlogProblems.length === 0,
+          backlogProblems,
+          stories: plan.stories.length,
           questions: memory.questionnaires.map((q) => q.questions.length),
           requirements: saved.analysis.requirements.length,
           calls: calls.length,
@@ -325,6 +384,7 @@ async function main() {
           result.discoveryOk &&
           result.assessmentOk &&
           result.documentsOk &&
+          result.backlogOk &&
           (result.questions[0] ?? 0) <= discovery.questions.length + discovery.maxFeatureQuestions &&
           result.questions.length <= discovery.maxRounds &&
           (result.questions[1] ?? 0) <= discovery.maxClarifications;
@@ -344,6 +404,9 @@ async function main() {
         for (const c of assessed.verdict.conditions) console.log(`    condition: ${c}`);
         console.log(
           `    documents: ${documents.filter((d) => d.needed).length} rendered, ${draft.requirements.acceptanceCriteria.length} requirements with acceptance criteria, roadmap proposal ${roadmapNeeded ? 'yes' : 'no'}${documentProblems.length ? `; problems: ${documentProblems.join(' | ')}` : '; validator clean'}`,
+        );
+        console.log(
+          `    backlog: ${plan.stories.length} stories, ${plan.stories.reduce((n, x) => n + x.blockedBy.length, 0)} Blocks links${backlogProblems.length ? `; problems: ${backlogProblems.join(' | ')}` : '; coverage 100 %, INVEST lint clean'}`,
         );
         for (const report of reports()) {
           const issues = [
@@ -374,6 +437,9 @@ async function main() {
           costP85: 0,
           documentsOk: false,
           documentProblems: [],
+          backlogOk: false,
+          backlogProblems: [],
+          stories: 0,
           questions: memory.questionnaires.map((q) => q.questions.length),
           requirements: 0,
           calls: calls.length,
@@ -384,6 +450,10 @@ async function main() {
         });
         console.log(`ERROR ${error}`);
         if (err instanceof Error && err.name === 'UsageLimitReached') break;
+      } finally {
+        cassette?.save();
+        if (cassette?.drift.length)
+          console.log(`    replay drift (prompts changed since recording): ${cassette.drift.join(', ')}`);
       }
     }
   } finally {
@@ -391,13 +461,13 @@ async function main() {
   }
 
   console.log(
-    '\n| Feature | Expected | Got | Discovery | Confidence | Verdict | Cost P85 | Docs | Questions | Reqs | Calls | Tokens | Time |',
+    '\n| Feature | Expected | Got | Discovery | Confidence | Verdict | Cost P85 | Docs | Backlog | Questions | Reqs | Calls | Tokens | Time |',
   );
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const r of results) {
     const magnitudeOk = r.magnitude === r.expected;
     console.log(
-      `| ${r.id} | ${r.expected} | ${r.magnitude}${magnitudeOk ? '' : ' ✗'} | ${r.discovery.join(' → ') || '-'}${r.discoveryOk ? '' : ' ✗'} | ${r.confidence} | ${r.verdict}${r.assessmentOk ? '' : ' ✗'} | ${Math.round(r.costP85).toLocaleString('en-US')} | ${r.documentsOk ? 'ok' : '✗'} | ${r.questions.join(' + ') || '-'} | ${r.requirements} | ${r.calls} | ${r.tokens.toLocaleString('en-US')} | ${r.seconds} s |`,
+      `| ${r.id} | ${r.expected} | ${r.magnitude}${magnitudeOk ? '' : ' ✗'} | ${r.discovery.join(' → ') || '-'}${r.discoveryOk ? '' : ' ✗'} | ${r.confidence} | ${r.verdict}${r.assessmentOk ? '' : ' ✗'} | ${Math.round(r.costP85).toLocaleString('en-US')} | ${r.documentsOk ? 'ok' : '✗'} | ${r.backlogOk ? `${r.stories} ok` : '✗'} | ${r.questions.join(' + ') || '-'} | ${r.requirements} | ${r.calls} | ${r.tokens.toLocaleString('en-US')} | ${r.seconds} s |`,
     );
   }
   // Across features: a cosmetic change must cost less than a core-engine change.

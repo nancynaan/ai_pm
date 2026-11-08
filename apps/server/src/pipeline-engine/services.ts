@@ -42,6 +42,8 @@ export function createAgentAsker(opts: {
   definitions: Map<string, AgentDefinition>;
   schemas: Record<string, z.ZodType>;
   defaultModel: string;
+  /** One line per Claude call, tagged with the run and stage (numbers only, never prompt text). */
+  log?: { info(obj: object, msg: string): void };
 }): StageServices['ask'] {
   return async <T>(ctx: StageContext, agent: string, prompt: string, options?: AskOptions<T>): Promise<T> => {
     const definition = opts.definitions.get(agent);
@@ -52,7 +54,21 @@ export function createAgentAsker(opts: {
       baselineDigest: ctx.baselineDigest,
     });
     return opts.runner.run(spec, prompt, {
-      onCall: (call) => ctx.repo.recordCall(ctx.run.id, ctx.executionId, call),
+      onCall: async (call) => {
+        opts.log?.info(
+          {
+            runId: ctx.run.id,
+            stage: ctx.run.state,
+            agent: call.agent,
+            status: call.status,
+            inputTokens: call.inputTokens,
+            outputTokens: call.outputTokens,
+            durationMs: call.durationMs,
+          },
+          'agent call',
+        );
+        await ctx.repo.recordCall(ctx.run.id, ctx.executionId, call);
+      },
       ...(options?.check ? { check: options.check } : {}),
     });
   };

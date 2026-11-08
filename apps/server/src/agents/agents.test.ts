@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { buildAgentSpec, loadAgentDefinitions, loadSkill } from './registry.js';
+import { buildAgentSpec, CLIENT_TEXT_RULE, loadAgentDefinitions, loadSkill } from './registry.js';
 import { AGENT_SCHEMAS } from './schemas.js';
 import { AgentCallFailed, type CallRecord, createAgentRunner, UsageLimitReached } from './runner.js';
 
@@ -161,7 +161,7 @@ describe('agent registry', () => {
     });
   });
 
-  it('builds a spec: prompt, then skills, then the baseline digest', () => {
+  it('builds a spec: prompt, the client-text rule, then skills, then the baseline digest', () => {
     const definition = loadAgentDefinitions(join(root, 'agents')).get('helper')!;
     const built = buildAgentSpec(definition, {
       defaultModel: 'claude-opus-5-5',
@@ -171,7 +171,7 @@ describe('agent registry', () => {
     });
     expect(built.model).toBe('claude-opus-5-5');
     expect(built.systemPrompt).toBe(
-      'You help.\n\n---\n\n# Skill: scrum-basics\n\nSprints last two weeks.\n\n---\n\n# Project baseline\n\n# Comet Run',
+      `You help.\n\n---\n\n${CLIENT_TEXT_RULE}\n\n---\n\n# Skill: scrum-basics\n\nSprints last two weeks.\n\n---\n\n# Project baseline\n\n# Comet Run`,
     );
     expect(() => buildAgentSpec(definition, { defaultModel: 'x', schemas: {} })).toThrow(/no output schema/);
   });

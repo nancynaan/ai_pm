@@ -5,6 +5,7 @@ import {
   healthReportSchema,
 } from '@ai-pm/shared';
 import { useCallback, useEffect, useState } from 'react';
+import { RunLogs } from './RunLog.js';
 
 const STATUS_TEXT: Record<string, string> = {
   ok: 'OK',
@@ -82,6 +83,7 @@ export function StatusPage() {
       </section>
 
       <Baseline />
+      <RunLogs />
     </>
   );
 }

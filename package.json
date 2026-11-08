@@ -25,7 +25,8 @@
     "test": "npm run test -w apps/server",
     "db:generate": "npm run db:generate -w apps/server --",
     "db:migrate": "npm run db:migrate -w apps/server",
-    "seed": "npm run seed -w apps/server --"
+    "seed": "npm run seed -w apps/server --",
+    "smoke": "npm run smoke -w apps/server"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

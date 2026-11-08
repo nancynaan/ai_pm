@@ -2,9 +2,13 @@ import { type AnsweredQuestionnaire, NOT_SURE, type Question } from '@ai-pm/shar
 import type { questionOut } from '../../agents/schemas.js';
 import type { z } from 'zod';
 
-/** The client's own words, fenced so agents treat them as data. */
+/** The client's own words, fenced so agents treat them as data (see CLIENT_TEXT_RULE). */
 export const clientRequest = (description: string) =>
   `<client_request>\n${description.replaceAll('</client_request>', '')}\n</client_request>`;
+
+/** Shorter free text from the client (answer details, comments), fenced the same way. */
+export const clientText = (text: string) =>
+  `<client_text>${text.replaceAll('</client_text>', '')}</client_text>`;
 
 const NOT_SURE_OPTION = { value: NOT_SURE, label: 'Not sure, let the team recommend' };
 
@@ -43,12 +47,12 @@ export function transcript(answered: AnsweredQuestionnaire[]): string {
           if (value === NOT_SURE) return 'Not sure';
           const label = q.options.find((o) => o.value === value)?.label ?? value;
           const detail = questionnaire.details?.[`${q.id}:${value}`];
-          return detail ? `${label} (${detail})` : label;
+          return detail ? `${label} (${clientText(detail)})` : label;
         });
         return `Q (${q.id}): ${q.text}\nA: ${labels.join('; ') || '(no answer)'}`;
       }),
       ...(questionnaire.comment
-        ? [`Additional comments (round ${questionnaire.round}): ${questionnaire.comment}`]
+        ? [`Additional comments (round ${questionnaire.round}): ${clientText(questionnaire.comment)}`]
         : []),
     ])
     .join('\n\n');

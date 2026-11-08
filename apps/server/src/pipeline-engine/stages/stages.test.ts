@@ -141,7 +141,7 @@ describe('prompt helpers', () => {
         },
       ]),
     ).toBe(
-      'Q (deadline): Deadline?\nA: Fixed date (31 October)\n\nAdditional comments (round 1): For Halloween',
+      'Q (deadline): Deadline?\nA: Fixed date (<client_text>31 October</client_text>)\n\nAdditional comments (round 1): <client_text>For Halloween</client_text>',
     );
   });
 
