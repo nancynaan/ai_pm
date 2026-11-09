@@ -97,8 +97,8 @@ export function RunView({ runId }: { runId: string }) {
   // The Documents card sits below the client's request to publish them, or below the latest
   // assessment until that request exists.
   const documentsAnchorId =
-    [...events].reverse().find((e) => e.key === 'documents.request' || e.key === 'documents.request.late')?.id ??
-    [...events].reverse().find((e) => e.event.type === 'assessment_ready')?.id;
+    [...events].reverse().find((e) => e.key === 'documents.request' || e.key === 'documents.request.late')
+      ?.id ?? [...events].reverse().find((e) => e.event.type === 'assessment_ready')?.id;
   // Only the latest decision card takes a decision; earlier ones are history.
   const lastDecisionId = [...events].reverse().find((e) => e.event.type === 'decision_requested')?.id;
   // A step paused at the usage limit says so on its placeholder card.
@@ -211,9 +211,6 @@ function EventItem({
             <span
               className={`tag ${event.decision === 'go' ? 'ok' : event.decision === 'no_go' ? 'err' : 'warn'}`}
             >
-              <span aria-hidden="true">
-                {event.decision === 'go' ? '✓' : event.decision === 'no_go' ? '✕' : '!'}
-              </span>{' '}
               {event.label}
             </span>
           </div>

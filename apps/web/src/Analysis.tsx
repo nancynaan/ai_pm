@@ -25,7 +25,6 @@ const date = (iso: string | null) =>
     : '–';
 
 const DECISION_TONE = { go: 'ok', go_with_conditions: 'warn', no_go: 'err' } as const;
-const DECISION_ICON = { go: '✓', go_with_conditions: '!', no_go: '✕' } as const;
 const DISCIPLINE: Record<string, string> = {
   gameplay: 'Gameplay',
   backend: 'Backend',
@@ -100,11 +99,7 @@ export function AnalysisList() {
 }
 
 function VerdictTag({ decision, label }: { decision: Assessment['verdict']['decision']; label: string }) {
-  return (
-    <span className={`tag ${DECISION_TONE[decision]}`}>
-      <span aria-hidden="true">{DECISION_ICON[decision]}</span> {label}
-    </span>
-  );
+  return <span className={`tag ${DECISION_TONE[decision]}`}>{label}</span>;
 }
 
 export function AnalysisView({ runId }: { runId: string }) {

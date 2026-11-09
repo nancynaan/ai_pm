@@ -84,7 +84,7 @@ export function DocumentsCard({ runId, version }: { runId: string; version: numb
           The Feature Brief, Requirements Specification and Estimation &amp; Release Forecast, plus this
           feature&apos;s entries for the shared Risk Register and Assumption Log; a Roadmap Update Proposal
           only when the roadmap changes. Generate them to preview them here and on the Documents tab;
-          publishing them to Confluence is optional.
+          publishing them to Confluence is required only to approve this feature.
         </p>
         {generating ? (
           <Waiting text="Please wait, the documents are generating. This takes a few minutes." />
