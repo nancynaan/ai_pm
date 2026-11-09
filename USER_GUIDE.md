@@ -105,6 +105,22 @@ Each button disappears once its step is done. There is no second generation and 
 
 <img src="docs/images/documents-card.png" alt="The Documents card: six documents generated, not published yet, and the Publish to Confluence button" width="520">
 
+#### The documents in Confluence
+
+Once published, each feature gets its own pages under **Comet Run: Feature Assessments**, numbered FA-1, FA-2 and so on. The Feature Brief is the main page. The Requirements Specification, the Estimation & Release Forecast and, when needed, the Roadmap Update Proposal sit under it. Every page opens with a note: the tables and figures come from the app's calculations, the text was drafted by AI, and the estimates stay preliminary until the team re-estimates them.
+
+The **Feature Brief** starts with an _At a glance_ table: the feature, its Jira Epic, the verdict and your decision.
+
+<img src="docs/images/confluence-feature-brief.png" alt="The FA-1 Feature Brief in Confluence: the AI PM note and the At a glance table with the Jira Epic AIPM-28 and the verdict Go, client approved" width="720">
+
+The **Requirements Specification** lists every requirement with its code, description, area, MoSCoW priority, whether it is in the MVP, and where it came from.
+
+<img src="docs/images/confluence-requirements.png" alt="The FA-1 Requirements Specification in Confluence: 21 requirements and the functional requirements table" width="720">
+
+The **Estimation & Release Forecast** sums up the size of the work in story points, how many sprints it takes and the delivery dates at P50, P85 and P95, for the MVP and the full scope.
+
+<img src="docs/images/confluence-estimation.png" alt="The FA-1 Estimation and Release Forecast in Confluence: the summary table with story-map items, size, sprints and dates" width="720">
+
 ### 6. The proposal
 
 The **Proposal** card holds a three-slide presentation:
@@ -146,6 +162,16 @@ The decision is final for this request. If you want a changed version of the fea
 - The step bar turns all green, the status reads **Approved**, and the conversation closes.
 
 <img src="docs/images/backlog-card.png" alt="The Backlog card after approval: the Epic and its 13 stories in Jira as an AI draft" width="520">
+
+#### The Epic and stories in Jira
+
+The **Epic** carries the feature's name. Its description starts with _"AI draft, pending Product Owner review"_ and the proposed priority, followed by an overview, the expected outcome and the scope. It has the labels `ai-draft`, `ai-pm` and `fa-1` (the number of the feature's documents in Confluence), and the game components it touches.
+
+<img src="docs/images/jira-epic.png" alt="The Epic AIPM-28 in Jira: an AI draft pending Product Owner review, status To Do, with the labels ai-draft, ai-pm and fa-1 and its components" width="720">
+
+The **stories** sit under the Epic in the backlog: status To Do, nobody assigned, each with a proposed priority. The gift chest feature got 13 stories, AIPM-29 to AIPM-41.
+
+<img src="docs/images/jira-stories.png" alt="The stories of the gift chest Epic in Jira: AIPM-29 to AIPM-37 of 13, all To Do and unassigned, with proposed priorities from Highest to Medium" width="720">
 
 The Product Owner then reviews and orders the stories, and the team refines and estimates them in Backlog Refinement.
 
