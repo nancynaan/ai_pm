@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_D06" targetNamespace="https://github.com/ai-pm/bpmn" exporter="ai-pm bpmn generator" exporterVersion="1.0">
+  <bpmn:collaboration id="Collaboration_D06">
+    <bpmn:participant id="Participant_D06_atl" name="Atlassian Cloud: Jira &amp; Confluence (REST API)" />
+    <bpmn:participant id="Participant_D06_org" name="Delivery organization" processRef="Process_D06_org" />
+    <bpmn:messageFlow id="Message_D06_1" name="Epic" sourceRef="h_epic" targetRef="Participant_D06_atl" />
+    <bpmn:messageFlow id="Message_D06_2" name="Stories" sourceRef="h_create" targetRef="Participant_D06_atl" />
+    <bpmn:messageFlow id="Message_D06_3" name="Issue links" sourceRef="h_links" targetRef="Participant_D06_atl" />
+    <bpmn:messageFlow id="Message_D06_4" name="Confluence pages" sourceRef="h_conf" targetRef="Participant_D06_atl" />
+    <bpmn:messageFlow id="Message_D06_5" name="Review in Jira" sourceRef="po_review" targetRef="Participant_D06_atl" />
+    <bpmn:messageFlow id="Message_D06_6" name="Sub-tasks" sourceRef="t_refine" targetRef="Participant_D06_atl" />
+    <bpmn:messageFlow id="Message_D06_7" name="Story points" sourceRef="t_estimate" targetRef="Participant_D06_atl" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_D06_org" name="Delivery organization" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_D06_org">
+      <bpmn:lane id="Lane_D06_h" name="AI PM: Pipeline engine">
+        <bpmn:flowNodeRef>h_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_cov</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_gate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_plan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_epic</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_create</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_links</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_conf</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_keys</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_card</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_D06_bb" name="AI PM: Backlog Builder Agent">
+        <bpmn:flowNodeRef>bb_write</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_D06_po" name="Product Owner">
+        <bpmn:flowNodeRef>po_review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>po_order</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_D06_team" name="Scrum Team (Developers)">
+        <bpmn:flowNodeRef>t_refine</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_estimate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_end</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="h_start" name="Client approved the feature (documents published)">
+      <bpmn:outgoing>Flow_D06_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="h_cov" name="Coverage gate: every requirement (except Won't) has a story">
+      <bpmn:incoming>Flow_D06_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:task id="bb_write" name="Write the Epic text and one story per item: Connextra, Gherkin AC, blockers (one call)">
+      <bpmn:incoming>Flow_D06_2</bpmn:incoming>
+      <bpmn:incoming>Flow_D06_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_3</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:serviceTask id="h_gate" name="DoR gate: one story per item, Connextra, blockers without cycles, no sizes">
+      <bpmn:incoming>Flow_D06_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="h_ok" name="Gate passed?">
+      <bpmn:incoming>Flow_D06_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_5</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D06_6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="h_plan" name="Proposed priority, AI estimate (PERT), labels ai-draft &amp; fa-&lt;n&gt;">
+      <bpmn:incoming>Flow_D06_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_epic" name="Create or complete the Epic; link the Feature Brief">
+      <bpmn:incoming>Flow_D06_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_create" name="Create or update the stories under the Epic">
+      <bpmn:incoming>Flow_D06_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_links" name="Create &quot;Blocks&quot; links">
+      <bpmn:incoming>Flow_D06_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_conf" name="Initial Product Backlog block; re-render the Feature Brief (if published)">
+      <bpmn:incoming>Flow_D06_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_keys" name="Store the Jira keys in the DB">
+      <bpmn:incoming>Flow_D06_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_12</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataAssoc_D06_1"><bpmn:targetRef>db</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="h_card" name="Backlog card with the Epic link; chat closed; Backlog tab">
+      <bpmn:incoming>Flow_D06_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_13</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:userTask id="po_review" name="Review &amp; adjust the AI draft in Jira; remove ai-draft">
+      <bpmn:incoming>Flow_D06_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_14</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="po_order" name="Order the Product Backlog; mark &quot;Ready for refinement&quot;">
+      <bpmn:incoming>Flow_D06_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_15</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="t_refine" name="Backlog Refinement: clarify, split, add sub-tasks">
+      <bpmn:incoming>Flow_D06_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_16</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:userTask id="t_estimate" name="Estimate (Planning Poker) &amp; confirm DoR">
+      <bpmn:incoming>Flow_D06_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_D06_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="t_end" name="Stories Ready for Sprint Planning">
+      <bpmn:incoming>Flow_D06_17</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:dataStoreReference id="db" name="Pipeline DB" />
+    <bpmn:sequenceFlow id="Flow_D06_1" sourceRef="h_start" targetRef="h_cov" />
+    <bpmn:sequenceFlow id="Flow_D06_2" sourceRef="h_cov" targetRef="bb_write" />
+    <bpmn:sequenceFlow id="Flow_D06_3" sourceRef="bb_write" targetRef="h_gate" />
+    <bpmn:sequenceFlow id="Flow_D06_4" sourceRef="h_gate" targetRef="h_ok" />
+    <bpmn:sequenceFlow id="Flow_D06_5" name="No: repair (at most 2)" sourceRef="h_ok" targetRef="bb_write" />
+    <bpmn:sequenceFlow id="Flow_D06_6" name="Yes" sourceRef="h_ok" targetRef="h_plan" />
+    <bpmn:sequenceFlow id="Flow_D06_7" sourceRef="h_plan" targetRef="h_epic" />
+    <bpmn:sequenceFlow id="Flow_D06_8" sourceRef="h_epic" targetRef="h_create" />
+    <bpmn:sequenceFlow id="Flow_D06_9" sourceRef="h_create" targetRef="h_links" />
+    <bpmn:sequenceFlow id="Flow_D06_10" sourceRef="h_links" targetRef="h_conf" />
+    <bpmn:sequenceFlow id="Flow_D06_11" sourceRef="h_conf" targetRef="h_keys" />
+    <bpmn:sequenceFlow id="Flow_D06_12" sourceRef="h_keys" targetRef="h_card" />
+    <bpmn:sequenceFlow id="Flow_D06_13" sourceRef="h_card" targetRef="po_review" />
+    <bpmn:sequenceFlow id="Flow_D06_14" sourceRef="po_review" targetRef="po_order" />
+    <bpmn:sequenceFlow id="Flow_D06_15" sourceRef="po_order" targetRef="t_refine" />
+    <bpmn:sequenceFlow id="Flow_D06_16" sourceRef="t_refine" targetRef="t_estimate" />
+    <bpmn:sequenceFlow id="Flow_D06_17" sourceRef="t_estimate" targetRef="t_end" />
+    <bpmn:textAnnotation id="n_jira"><bpmn:text>Every issue: status To Do, no sprint, label ai-draft (plus ai-pm, fa-&lt;n&gt;, and enabler, nfr or spike), proposed priority &quot;pending PO review&quot;, AI-generated description with Gherkin AC, custom field &quot;AI estimate (SP)&quot;. Story Points stay empty for the team. Found again by sync log and marker label: no duplicates.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="n_manual"><bpmn:text>Human Scrum event: not automated. The pipeline only prepares the input.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Assoc_D06_1" associationDirection="None" sourceRef="h_create" targetRef="n_jira" />
+    <bpmn:association id="Assoc_D06_2" associationDirection="None" sourceRef="t_refine" targetRef="n_manual" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_D06" name="06 Backlog &amp; refinement">
+    <bpmndi:BPMNPlane id="Plane_D06" bpmnElement="Collaboration_D06">
+      <bpmndi:BPMNShape id="Participant_D06_atl_di" bpmnElement="Participant_D06_atl" isHorizontal="true"><dc:Bounds x="40" y="40" width="3010" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_D06_org_di" bpmnElement="Participant_D06_org" isHorizontal="true"><dc:Bounds x="40" y="156" width="3010" height="766" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D06_h_di" bpmnElement="Lane_D06_h" isHorizontal="true"><dc:Bounds x="70" y="156" width="2980" height="256" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D06_bb_di" bpmnElement="Lane_D06_bb" isHorizontal="true"><dc:Bounds x="70" y="412" width="2980" height="150" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D06_po_di" bpmnElement="Lane_D06_po" isHorizontal="true"><dc:Bounds x="70" y="562" width="2980" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D06_team_di" bpmnElement="Lane_D06_team" isHorizontal="true"><dc:Bounds x="70" y="682" width="2980" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_start_di" bpmnElement="h_start"><dc:Bounds x="187" y="214" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="160" y="254" width="90" height="56" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_cov_di" bpmnElement="h_cov"><dc:Bounds x="310" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="bb_write_di" bpmnElement="bb_write"><dc:Bounds x="480" y="432" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_gate_di" bpmnElement="h_gate"><dc:Bounds x="650" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_ok_di" bpmnElement="h_ok" isMarkerVisible="true"><dc:Bounds x="860" y="207" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="846" y="189" width="79" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_plan_di" bpmnElement="h_plan"><dc:Bounds x="990" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_epic_di" bpmnElement="h_epic"><dc:Bounds x="1160" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_create_di" bpmnElement="h_create"><dc:Bounds x="1330" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_links_di" bpmnElement="h_links"><dc:Bounds x="1500" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_conf_di" bpmnElement="h_conf"><dc:Bounds x="1670" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_keys_di" bpmnElement="h_keys"><dc:Bounds x="1840" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_card_di" bpmnElement="h_card"><dc:Bounds x="2010" y="192" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="po_review_di" bpmnElement="po_review"><dc:Bounds x="2180" y="582" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="po_order_di" bpmnElement="po_order"><dc:Bounds x="2350" y="582" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_refine_di" bpmnElement="t_refine"><dc:Bounds x="2520" y="702" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_estimate_di" bpmnElement="t_estimate"><dc:Bounds x="2690" y="702" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_end_di" bpmnElement="t_end"><dc:Bounds x="2907" y="724" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2880" y="764" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="db_di" bpmnElement="db"><dc:Bounds x="1880" y="327" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1869" y="381" width="73" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_jira_di" bpmnElement="n_jira"><dc:Bounds x="1160" y="306" width="300" height="92" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_manual_di" bpmnElement="n_manual"><dc:Bounds x="2480" y="837" width="210" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_D06_1_di" bpmnElement="Flow_D06_1"><di:waypoint x="223" y="232" /><di:waypoint x="310" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_2_di" bpmnElement="Flow_D06_2"><di:waypoint x="440" y="232" /><di:waypoint x="460" y="232" /><di:waypoint x="460" y="472" /><di:waypoint x="480" y="472" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_3_di" bpmnElement="Flow_D06_3"><di:waypoint x="610" y="472" /><di:waypoint x="630" y="472" /><di:waypoint x="630" y="232" /><di:waypoint x="650" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_4_di" bpmnElement="Flow_D06_4"><di:waypoint x="780" y="232" /><di:waypoint x="860" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_5_di" bpmnElement="Flow_D06_5"><di:waypoint x="885" y="257" /><di:waypoint x="885" y="532" /><di:waypoint x="545" y="532" /><di:waypoint x="545" y="512" /><bpmndi:BPMNLabel><dc:Bounds x="891" y="263" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_6_di" bpmnElement="Flow_D06_6"><di:waypoint x="910" y="232" /><di:waypoint x="990" y="232" /><bpmndi:BPMNLabel><dc:Bounds x="918" y="214" width="23" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_7_di" bpmnElement="Flow_D06_7"><di:waypoint x="1120" y="232" /><di:waypoint x="1160" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_8_di" bpmnElement="Flow_D06_8"><di:waypoint x="1290" y="232" /><di:waypoint x="1330" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_9_di" bpmnElement="Flow_D06_9"><di:waypoint x="1460" y="232" /><di:waypoint x="1500" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_10_di" bpmnElement="Flow_D06_10"><di:waypoint x="1630" y="232" /><di:waypoint x="1670" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_11_di" bpmnElement="Flow_D06_11"><di:waypoint x="1800" y="232" /><di:waypoint x="1840" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_12_di" bpmnElement="Flow_D06_12"><di:waypoint x="1970" y="232" /><di:waypoint x="2010" y="232" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_13_di" bpmnElement="Flow_D06_13"><di:waypoint x="2140" y="232" /><di:waypoint x="2160" y="232" /><di:waypoint x="2160" y="622" /><di:waypoint x="2180" y="622" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_14_di" bpmnElement="Flow_D06_14"><di:waypoint x="2310" y="622" /><di:waypoint x="2350" y="622" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_15_di" bpmnElement="Flow_D06_15"><di:waypoint x="2480" y="622" /><di:waypoint x="2500" y="622" /><di:waypoint x="2500" y="742" /><di:waypoint x="2520" y="742" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_16_di" bpmnElement="Flow_D06_16"><di:waypoint x="2650" y="742" /><di:waypoint x="2690" y="742" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D06_17_di" bpmnElement="Flow_D06_17"><di:waypoint x="2820" y="742" /><di:waypoint x="2907" y="742" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_1_di" bpmnElement="Message_D06_1"><di:waypoint x="1225" y="192" /><di:waypoint x="1225" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="1231" y="121" width="29" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_2_di" bpmnElement="Message_D06_2"><di:waypoint x="1395" y="192" /><di:waypoint x="1395" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="1401" y="121" width="48" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_3_di" bpmnElement="Message_D06_3"><di:waypoint x="1565" y="192" /><di:waypoint x="1565" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="1571" y="121" width="73" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_4_di" bpmnElement="Message_D06_4"><di:waypoint x="1735" y="192" /><di:waypoint x="1735" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="1741" y="114" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_5_di" bpmnElement="Message_D06_5"><di:waypoint x="2245" y="582" /><di:waypoint x="2245" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="2251" y="114" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_6_di" bpmnElement="Message_D06_6"><di:waypoint x="2585" y="702" /><di:waypoint x="2585" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="2591" y="121" width="60" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D06_7_di" bpmnElement="Message_D06_7"><di:waypoint x="2755" y="702" /><di:waypoint x="2755" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="2761" y="121" width="79" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataAssoc_D06_1_di" bpmnElement="DataAssoc_D06_1"><di:waypoint x="1905" y="272" /><di:waypoint x="1905" y="327" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D06_1_di" bpmnElement="Assoc_D06_1"><di:waypoint x="1395" y="272" /><di:waypoint x="1395" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D06_2_di" bpmnElement="Assoc_D06_2"><di:waypoint x="2585" y="782" /><di:waypoint x="2585" y="837" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

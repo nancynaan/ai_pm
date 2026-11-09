@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_D04" targetNamespace="https://github.com/ai-pm/bpmn" exporter="ai-pm bpmn generator" exporterVersion="1.0">
+  <bpmn:collaboration id="Collaboration_D04">
+    <bpmn:participant id="Participant_D04_client" name="Client (feature sponsor)" processRef="Process_D04_client" />
+    <bpmn:participant id="Participant_D04_ai" name="AI PM Pipeline" processRef="Process_D04_ai" />
+    <bpmn:participant id="Participant_D04_atl" name="Atlassian Cloud: Jira &amp; Confluence (REST API)" />
+    <bpmn:messageFlow id="Message_D04_1" name="Generate documents" sourceRef="c_generate" targetRef="h_wait" />
+    <bpmn:messageFlow id="Message_D04_2" name="Skip for now" sourceRef="c_skip" targetRef="h_skip" />
+    <bpmn:messageFlow id="Message_D04_3" name="Previews on the Documents card" sourceRef="h_save" targetRef="c_ready" />
+    <bpmn:messageFlow id="Message_D04_4" name="Publish to Confluence" sourceRef="c_publish" targetRef="h_pub" />
+    <bpmn:messageFlow id="Message_D04_5" name="Create pages" sourceRef="h_pages" targetRef="Participant_D04_atl" />
+    <bpmn:messageFlow id="Message_D04_6" name="Add feature block" sourceRef="h_living" targetRef="Participant_D04_atl" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_D04_client" name="Client (feature sponsor)" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_D04_client">
+      <bpmn:lane id="Lane_D04_client" name="Client (feature sponsor)">
+        <bpmn:flowNodeRef>c_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_gw</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_generate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_skip</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_skipped</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_ready</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_pubgw</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_publish</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_end</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="c_start" name="Assessment ready">
+      <bpmn:outgoing>Flow_D04_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="c_gw" name="Generate or skip?">
+      <bpmn:incoming>Flow_D04_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D04_3</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="c_generate" name="Press &quot;Generate documents&quot;">
+      <bpmn:incoming>Flow_D04_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="c_skip" name="&quot;Skip for now&quot; (any verdict; Approve still needs the documents)">
+      <bpmn:incoming>Flow_D04_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_4</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="c_skipped" name="Skipped: on to the proposal">
+      <bpmn:incoming>Flow_D04_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="c_ready" name="Documents ready, with previews">
+      <bpmn:incoming>Flow_D04_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_6</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="c_ready_def" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="c_pubgw" name="Publish now?">
+      <bpmn:incoming>Flow_D04_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_7</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D04_8</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="c_publish" name="&quot;Publish to Confluence&quot; (once; needed to approve)">
+      <bpmn:incoming>Flow_D04_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_9</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="c_end" name="On to the proposal">
+      <bpmn:incoming>Flow_D04_8</bpmn:incoming>
+      <bpmn:incoming>Flow_D04_9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_D04_1" sourceRef="c_start" targetRef="c_gw" />
+    <bpmn:sequenceFlow id="Flow_D04_2" name="Generate" sourceRef="c_gw" targetRef="c_generate" />
+    <bpmn:sequenceFlow id="Flow_D04_3" name="Skip" sourceRef="c_gw" targetRef="c_skip" />
+    <bpmn:sequenceFlow id="Flow_D04_4" sourceRef="c_skip" targetRef="c_skipped" />
+    <bpmn:sequenceFlow id="Flow_D04_5" sourceRef="c_generate" targetRef="c_ready" />
+    <bpmn:sequenceFlow id="Flow_D04_6" sourceRef="c_ready" targetRef="c_pubgw" />
+    <bpmn:sequenceFlow id="Flow_D04_7" name="Yes" sourceRef="c_pubgw" targetRef="c_publish" />
+    <bpmn:sequenceFlow id="Flow_D04_8" name="Later (before Approve) or never" sourceRef="c_pubgw" targetRef="c_end" />
+    <bpmn:sequenceFlow id="Flow_D04_9" sourceRef="c_publish" targetRef="c_end" />
+  </bpmn:process>
+  <bpmn:process id="Process_D04_ai" name="AI PM Pipeline" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_D04_ai">
+      <bpmn:lane id="Lane_D04_h" name="Pipeline engine (deterministic)">
+        <bpmn:flowNodeRef>h_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_wait</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_skip</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_skipped</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_ctx</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_check</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_gw</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_save</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_next</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_pub</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_pages</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_living</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_links</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>h_published</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_D04_wr" name="PM Writer Agent">
+        <bpmn:flowNodeRef>wr_draft</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>wr_fix</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="h_start" name="Assessment data ready">
+      <bpmn:outgoing>Flow_D04_10</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D04_11</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:intermediateCatchEvent id="h_wait" name="Client generates the documents">
+      <bpmn:incoming>Flow_D04_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_13</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="h_wait_def" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="h_skip" name="Client skips the documents">
+      <bpmn:incoming>Flow_D04_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_12</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="h_skip_def" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="h_skipped" name="No documents: on to the presentation">
+      <bpmn:incoming>Flow_D04_12</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="h_ctx" name="Build document context from the DB (single source of truth)">
+      <bpmn:incoming>Flow_D04_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_14</bpmn:outgoing>
+      <bpmn:property id="Property_h_ctx" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataAssoc_D04_1"><bpmn:sourceRef>db1</bpmn:sourceRef><bpmn:targetRef>Property_h_ctx</bpmn:targetRef></bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:task id="wr_draft" name="Draft the text of all documents (one call)">
+      <bpmn:incoming>Flow_D04_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_15</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:serviceTask id="h_check" name="Validate each document: sections, figures = DB, REQ IDs, acceptance criteria">
+      <bpmn:incoming>Flow_D04_15</bpmn:incoming>
+      <bpmn:incoming>Flow_D04_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_16</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics />
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="h_gw" name="All documents valid?">
+      <bpmn:incoming>Flow_D04_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_17</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D04_19</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="wr_fix" name="Repair flagged sections">
+      <bpmn:incoming>Flow_D04_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_18</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:serviceTask id="h_save" name="Save as generated (nothing in Confluence); previews on the card">
+      <bpmn:incoming>Flow_D04_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_20</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="h_next" name="Generated: on to the presentation, no wait for a publish">
+      <bpmn:incoming>Flow_D04_20</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:intermediateCatchEvent id="h_pub" name="Client publishes (optional, once)">
+      <bpmn:outgoing>Flow_D04_21</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="h_pub_def" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="h_pages" name="Create the feature pages in Confluence">
+      <bpmn:incoming>Flow_D04_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_22</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_living" name="Add the feature block to the Risk Register and Assumption Log">
+      <bpmn:incoming>Flow_D04_22</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_23</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="h_links" name="Store page IDs &amp; links; the button reads &quot;Published&quot;">
+      <bpmn:incoming>Flow_D04_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_D04_24</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataAssoc_D04_2"><bpmn:targetRef>db2</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="h_published" name="Documents published">
+      <bpmn:incoming>Flow_D04_24</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:dataStoreReference id="db1" name="Pipeline DB" />
+    <bpmn:dataStoreReference id="db2" name="Pipeline DB" />
+    <bpmn:sequenceFlow id="Flow_D04_10" sourceRef="h_start" targetRef="h_wait" />
+    <bpmn:sequenceFlow id="Flow_D04_11" sourceRef="h_start" targetRef="h_skip" />
+    <bpmn:sequenceFlow id="Flow_D04_12" sourceRef="h_skip" targetRef="h_skipped" />
+    <bpmn:sequenceFlow id="Flow_D04_13" sourceRef="h_wait" targetRef="h_ctx" />
+    <bpmn:sequenceFlow id="Flow_D04_14" sourceRef="h_ctx" targetRef="wr_draft" />
+    <bpmn:sequenceFlow id="Flow_D04_15" sourceRef="wr_draft" targetRef="h_check" />
+    <bpmn:sequenceFlow id="Flow_D04_16" sourceRef="h_check" targetRef="h_gw" />
+    <bpmn:sequenceFlow id="Flow_D04_17" name="No (max 2 repairs)" sourceRef="h_gw" targetRef="wr_fix" />
+    <bpmn:sequenceFlow id="Flow_D04_18" sourceRef="wr_fix" targetRef="h_check" />
+    <bpmn:sequenceFlow id="Flow_D04_19" name="Yes" sourceRef="h_gw" targetRef="h_save" />
+    <bpmn:sequenceFlow id="Flow_D04_20" sourceRef="h_save" targetRef="h_next" />
+    <bpmn:sequenceFlow id="Flow_D04_21" sourceRef="h_pub" targetRef="h_pages" />
+    <bpmn:sequenceFlow id="Flow_D04_22" sourceRef="h_pages" targetRef="h_living" />
+    <bpmn:sequenceFlow id="Flow_D04_23" sourceRef="h_living" targetRef="h_links" />
+    <bpmn:sequenceFlow id="Flow_D04_24" sourceRef="h_links" targetRef="h_published" />
+    <bpmn:textAnnotation id="n_docs"><bpmn:text>One call writes the text of: Feature Brief (problem, objectives, value, scope, impact, recommendation), Requirements Specification (user flows, business rules, acceptance criteria), Estimation &amp; Release Forecast (sequencing, confidence) and, when needed, the Roadmap Update Proposal. Computed values only as {{figure:key}}. The draft is reused while the assessment is unchanged.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="n_tree"><bpmn:text>Space &gt; Feature Assessments &gt; FA-&lt;n&gt; Feature Brief (Epic key) &gt; Requirements Specification, Estimation &amp; Release Forecast, Roadmap Update Proposal (only when the roadmap changes). Published once: no re-publish. Later steps update pages already published (decision, Epic, deck), never a first publish.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Assoc_D04_1" associationDirection="None" sourceRef="wr_draft" targetRef="n_docs" />
+    <bpmn:association id="Assoc_D04_2" associationDirection="None" sourceRef="h_pages" targetRef="n_tree" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_D04" name="04 Documents &amp; Confluence">
+    <bpmndi:BPMNPlane id="Plane_D04" bpmnElement="Collaboration_D04">
+      <bpmndi:BPMNShape id="Participant_D04_client_di" bpmnElement="Participant_D04_client" isHorizontal="true"><dc:Bounds x="40" y="40" width="2500" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D04_client_di" bpmnElement="Lane_D04_client" isHorizontal="true"><dc:Bounds x="70" y="40" width="2470" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_D04_ai_di" bpmnElement="Participant_D04_ai" isHorizontal="true"><dc:Bounds x="40" y="336" width="2500" height="496" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D04_h_di" bpmnElement="Lane_D04_h" isHorizontal="true"><dc:Bounds x="70" y="336" width="2470" height="256" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D04_wr_di" bpmnElement="Lane_D04_wr" isHorizontal="true"><dc:Bounds x="70" y="592" width="2470" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_D04_atl_di" bpmnElement="Participant_D04_atl" isHorizontal="true"><dc:Bounds x="40" y="888" width="2500" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_start_di" bpmnElement="c_start"><dc:Bounds x="187" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="160" y="122" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_gw_di" bpmnElement="c_gw" isMarkerVisible="true"><dc:Bounds x="350" y="75" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="330" y="43" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_generate_di" bpmnElement="c_generate"><dc:Bounds x="480" y="60" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_skip_di" bpmnElement="c_skip"><dc:Bounds x="310" y="180" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_skipped_di" bpmnElement="c_skipped"><dc:Bounds x="527" y="202" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="500" y="242" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_ready_di" bpmnElement="c_ready"><dc:Bounds x="1377" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1350" y="36" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_pubgw_di" bpmnElement="c_pubgw" isMarkerVisible="true"><dc:Bounds x="1540" y="75" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1526" y="57" width="79" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_publish_di" bpmnElement="c_publish"><dc:Bounds x="1670" y="60" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_end_di" bpmnElement="c_end"><dc:Bounds x="1887" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1860" y="122" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_start_di" bpmnElement="h_start"><dc:Bounds x="187" y="394" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="160" y="434" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_wait_di" bpmnElement="h_wait"><dc:Bounds x="527" y="394" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="500" y="434" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_skip_di" bpmnElement="h_skip"><dc:Bounds x="357" y="514" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="330" y="554" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_skipped_di" bpmnElement="h_skipped"><dc:Bounds x="527" y="514" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="500" y="554" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_ctx_di" bpmnElement="h_ctx"><dc:Bounds x="650" y="372" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="wr_draft_di" bpmnElement="wr_draft"><dc:Bounds x="820" y="612" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_check_di" bpmnElement="h_check"><dc:Bounds x="990" y="372" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_gw_di" bpmnElement="h_gw" isMarkerVisible="true"><dc:Bounds x="1200" y="387" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1180" y="355" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="wr_fix_di" bpmnElement="wr_fix"><dc:Bounds x="1160" y="612" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_save_di" bpmnElement="h_save"><dc:Bounds x="1330" y="372" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_next_di" bpmnElement="h_next"><dc:Bounds x="1547" y="394" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1520" y="434" width="90" height="70" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_pub_di" bpmnElement="h_pub"><dc:Bounds x="1717" y="514" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1690" y="554" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_pages_di" bpmnElement="h_pages"><dc:Bounds x="1840" y="492" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_living_di" bpmnElement="h_living"><dc:Bounds x="2010" y="492" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_links_di" bpmnElement="h_links"><dc:Bounds x="2180" y="492" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="h_published_di" bpmnElement="h_published"><dc:Bounds x="2397" y="514" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2370" y="554" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="db1_di" bpmnElement="db1"><dc:Bounds x="690" y="507" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="679" y="561" width="73" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="db2_di" bpmnElement="db2"><dc:Bounds x="2220" y="387" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="2209" y="441" width="73" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_docs_di" bpmnElement="n_docs"><dc:Bounds x="695" y="714" width="380" height="116" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_tree_di" bpmnElement="n_tree"><dc:Bounds x="1755" y="604" width="300" height="96" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_D04_1_di" bpmnElement="Flow_D04_1"><di:waypoint x="223" y="100" /><di:waypoint x="350" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_2_di" bpmnElement="Flow_D04_2"><di:waypoint x="400" y="100" /><di:waypoint x="480" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="408" y="82" width="54" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_3_di" bpmnElement="Flow_D04_3"><di:waypoint x="375" y="125" /><di:waypoint x="375" y="180" /><bpmndi:BPMNLabel><dc:Bounds x="381" y="131" width="29" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_4_di" bpmnElement="Flow_D04_4"><di:waypoint x="440" y="220" /><di:waypoint x="527" y="220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_5_di" bpmnElement="Flow_D04_5"><di:waypoint x="610" y="100" /><di:waypoint x="1377" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_6_di" bpmnElement="Flow_D04_6"><di:waypoint x="1413" y="100" /><di:waypoint x="1540" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_7_di" bpmnElement="Flow_D04_7"><di:waypoint x="1590" y="100" /><di:waypoint x="1670" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="1598" y="82" width="23" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_8_di" bpmnElement="Flow_D04_8"><di:waypoint x="1565" y="125" /><di:waypoint x="1565" y="145" /><di:waypoint x="1905" y="145" /><di:waypoint x="1905" y="118" /><bpmndi:BPMNLabel><dc:Bounds x="1571" y="131" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_9_di" bpmnElement="Flow_D04_9"><di:waypoint x="1800" y="100" /><di:waypoint x="1887" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_10_di" bpmnElement="Flow_D04_10"><di:waypoint x="223" y="412" /><di:waypoint x="527" y="412" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_11_di" bpmnElement="Flow_D04_11"><di:waypoint x="223" y="412" /><di:waypoint x="290" y="412" /><di:waypoint x="290" y="532" /><di:waypoint x="357" y="532" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_12_di" bpmnElement="Flow_D04_12"><di:waypoint x="393" y="532" /><di:waypoint x="527" y="532" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_13_di" bpmnElement="Flow_D04_13"><di:waypoint x="563" y="412" /><di:waypoint x="650" y="412" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_14_di" bpmnElement="Flow_D04_14"><di:waypoint x="780" y="412" /><di:waypoint x="800" y="412" /><di:waypoint x="800" y="652" /><di:waypoint x="820" y="652" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_15_di" bpmnElement="Flow_D04_15"><di:waypoint x="950" y="652" /><di:waypoint x="970" y="652" /><di:waypoint x="970" y="412" /><di:waypoint x="990" y="412" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_16_di" bpmnElement="Flow_D04_16"><di:waypoint x="1120" y="412" /><di:waypoint x="1200" y="412" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_17_di" bpmnElement="Flow_D04_17"><di:waypoint x="1225" y="437" /><di:waypoint x="1225" y="612" /><bpmndi:BPMNLabel><dc:Bounds x="1231" y="443" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_18_di" bpmnElement="Flow_D04_18"><di:waypoint x="1225" y="692" /><di:waypoint x="1225" y="712" /><di:waypoint x="1055" y="712" /><di:waypoint x="1055" y="452" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_19_di" bpmnElement="Flow_D04_19"><di:waypoint x="1250" y="412" /><di:waypoint x="1330" y="412" /><bpmndi:BPMNLabel><dc:Bounds x="1258" y="394" width="23" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_20_di" bpmnElement="Flow_D04_20"><di:waypoint x="1460" y="412" /><di:waypoint x="1547" y="412" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_21_di" bpmnElement="Flow_D04_21"><di:waypoint x="1753" y="532" /><di:waypoint x="1840" y="532" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_22_di" bpmnElement="Flow_D04_22"><di:waypoint x="1970" y="532" /><di:waypoint x="2010" y="532" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_23_di" bpmnElement="Flow_D04_23"><di:waypoint x="2140" y="532" /><di:waypoint x="2180" y="532" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D04_24_di" bpmnElement="Flow_D04_24"><di:waypoint x="2310" y="532" /><di:waypoint x="2397" y="532" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D04_1_di" bpmnElement="Message_D04_1"><di:waypoint x="545" y="140" /><di:waypoint x="545" y="394" /><bpmndi:BPMNLabel><dc:Bounds x="551" y="294" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D04_2_di" bpmnElement="Message_D04_2"><di:waypoint x="375" y="260" /><di:waypoint x="375" y="514" /><bpmndi:BPMNLabel><dc:Bounds x="381" y="301" width="79" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D04_3_di" bpmnElement="Message_D04_3"><di:waypoint x="1395" y="372" /><di:waypoint x="1395" y="118" /><bpmndi:BPMNLabel><dc:Bounds x="1401" y="287" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D04_4_di" bpmnElement="Message_D04_4"><di:waypoint x="1735" y="140" /><di:waypoint x="1735" y="514" /><bpmndi:BPMNLabel><dc:Bounds x="1741" y="294" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D04_5_di" bpmnElement="Message_D04_5"><di:waypoint x="1905" y="572" /><di:waypoint x="1905" y="888" /><bpmndi:BPMNLabel><dc:Bounds x="1911" y="853" width="79" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D04_6_di" bpmnElement="Message_D04_6"><di:waypoint x="2075" y="572" /><di:waypoint x="2075" y="888" /><bpmndi:BPMNLabel><dc:Bounds x="2081" y="846" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataAssoc_D04_1_di" bpmnElement="DataAssoc_D04_1"><di:waypoint x="715" y="507" /><di:waypoint x="715" y="452" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataAssoc_D04_2_di" bpmnElement="DataAssoc_D04_2"><di:waypoint x="2245" y="492" /><di:waypoint x="2245" y="437" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D04_1_di" bpmnElement="Assoc_D04_1"><di:waypoint x="855" y="692" /><di:waypoint x="855" y="714" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D04_2_di" bpmnElement="Assoc_D04_2"><di:waypoint x="1905" y="572" /><di:waypoint x="1905" y="604" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

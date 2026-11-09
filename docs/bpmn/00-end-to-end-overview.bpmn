@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_D00" targetNamespace="https://github.com/ai-pm/bpmn" exporter="ai-pm bpmn generator" exporterVersion="1.0">
+  <bpmn:collaboration id="Collaboration_D00">
+    <bpmn:participant id="Participant_D00_client" name="Client (feature sponsor)" processRef="Process_D00_client" />
+    <bpmn:participant id="Participant_D00_org" name="Delivery organization" processRef="Process_D00_org" />
+    <bpmn:participant id="Participant_D00_atl" name="Atlassian Cloud: Jira &amp; Confluence (REST API)" />
+    <bpmn:messageFlow id="Message_D00_1" name="Feature description" sourceRef="c_describe" targetRef="a_start" />
+    <bpmn:messageFlow id="Message_D00_2" name="Questionnaire" sourceRef="a_intake" targetRef="c_answer" />
+    <bpmn:messageFlow id="Message_D00_3" name="Answers" sourceRef="c_answer" targetRef="a_intake" />
+    <bpmn:messageFlow id="Message_D00_4" name="Assessment &amp; slides" sourceRef="a_present" targetRef="c_receive" />
+    <bpmn:messageFlow id="Message_D00_5" name="Decision" sourceRef="c_decide" targetRef="a_decision" />
+    <bpmn:messageFlow id="Message_D00_6" name="Draft Epic" sourceRef="a_intake" targetRef="Participant_D00_atl" />
+    <bpmn:messageFlow id="Message_D00_7" name="Baseline &amp; backlog" sourceRef="Participant_D00_atl" targetRef="a_analysis" />
+    <bpmn:messageFlow id="Message_D00_8" name="Confluence pages (optional)" sourceRef="a_docs" targetRef="Participant_D00_atl" />
+    <bpmn:messageFlow id="Message_D00_9" name="Epic, stories, links" sourceRef="a_backlog" targetRef="Participant_D00_atl" />
+    <bpmn:messageFlow id="Message_D00_10" name="Review in Jira" sourceRef="po_review" targetRef="Participant_D00_atl" />
+    <bpmn:messageFlow id="Message_D00_11" name="Sub-tasks, estimates" sourceRef="t_refine" targetRef="Participant_D00_atl" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_D00_client" name="Client (feature sponsor)" isExecutable="false">
+    <bpmn:startEvent id="c_start" name="New feature idea">
+      <bpmn:outgoing>Flow_D00_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="c_describe" name="Describe the feature in the chat UI">
+      <bpmn:incoming>Flow_D00_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="c_answer" name="Answer questionnaire (predefined options)">
+      <bpmn:incoming>Flow_D00_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:intermediateCatchEvent id="c_receive" name="Assessment &amp; slides received">
+      <bpmn:incoming>Flow_D00_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_4</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="c_receive_def" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="c_decide" name="Review presentation and decide">
+      <bpmn:incoming>Flow_D00_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="c_end" name="Decision sent">
+      <bpmn:incoming>Flow_D00_5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_D00_1" sourceRef="c_start" targetRef="c_describe" />
+    <bpmn:sequenceFlow id="Flow_D00_2" sourceRef="c_describe" targetRef="c_answer" />
+    <bpmn:sequenceFlow id="Flow_D00_3" sourceRef="c_answer" targetRef="c_receive" />
+    <bpmn:sequenceFlow id="Flow_D00_4" sourceRef="c_receive" targetRef="c_decide" />
+    <bpmn:sequenceFlow id="Flow_D00_5" sourceRef="c_decide" targetRef="c_end" />
+  </bpmn:process>
+  <bpmn:process id="Process_D00_org" name="Delivery organization" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_D00_org">
+      <bpmn:lane id="Lane_D00_ai" name="AI PM Pipeline (automated)">
+        <bpmn:flowNodeRef>a_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_intake</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_analysis</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_estimate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_docs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_present</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_gw</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_backlog</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>a_declined</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_D00_po" name="Product Owner">
+        <bpmn:flowNodeRef>po_review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>po_order</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_D00_team" name="Scrum Team">
+        <bpmn:flowNodeRef>t_refine</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_ready</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="a_start" name="Feature request received">
+      <bpmn:outgoing>Flow_D00_6</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="a_start_def" />
+    </bpmn:startEvent>
+    <bpmn:callActivity id="a_intake" name="Intake &amp; elicitation" calledElement="Process_D01_ai">
+      <bpmn:incoming>Flow_D00_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_7</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="a_analysis" name="Analysis &amp; impact" calledElement="Process_D02_ai">
+      <bpmn:incoming>Flow_D00_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_8</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="a_estimate" name="Estimation, value &amp; risk" calledElement="Process_D03_ai">
+      <bpmn:incoming>Flow_D00_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_9</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="a_docs" name="Documents: generate (or skip); publish optional" calledElement="Process_D04_ai">
+      <bpmn:incoming>Flow_D00_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_10</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="a_present" name="Client presentation" calledElement="Process_D05_ai">
+      <bpmn:incoming>Flow_D00_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_11</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:intermediateCatchEvent id="a_decision" name="Client decision received">
+      <bpmn:incoming>Flow_D00_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_12</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="a_decision_def" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="a_gw" name="Decision?">
+      <bpmn:incoming>Flow_D00_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_13</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D00_14</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="a_backlog" name="Backlog generation (Jira)" calledElement="Process_D06_org">
+      <bpmn:incoming>Flow_D00_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_15</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="a_declined" name="Feature declined: chat closed">
+      <bpmn:incoming>Flow_D00_14</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="po_review" name="Review &amp; adjust Epic and stories in Jira">
+      <bpmn:incoming>Flow_D00_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_16</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="po_order" name="Order the Product Backlog">
+      <bpmn:incoming>Flow_D00_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="t_refine" name="Backlog Refinement: clarify, split, add sub-tasks, estimate">
+      <bpmn:incoming>Flow_D00_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_D00_18</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:endEvent id="t_ready" name="Stories Ready for Sprint Planning">
+      <bpmn:incoming>Flow_D00_18</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_D00_6" sourceRef="a_start" targetRef="a_intake" />
+    <bpmn:sequenceFlow id="Flow_D00_7" sourceRef="a_intake" targetRef="a_analysis" />
+    <bpmn:sequenceFlow id="Flow_D00_8" sourceRef="a_analysis" targetRef="a_estimate" />
+    <bpmn:sequenceFlow id="Flow_D00_9" sourceRef="a_estimate" targetRef="a_docs" />
+    <bpmn:sequenceFlow id="Flow_D00_10" sourceRef="a_docs" targetRef="a_present" />
+    <bpmn:sequenceFlow id="Flow_D00_11" sourceRef="a_present" targetRef="a_decision" />
+    <bpmn:sequenceFlow id="Flow_D00_12" sourceRef="a_decision" targetRef="a_gw" />
+    <bpmn:sequenceFlow id="Flow_D00_13" name="Approve" sourceRef="a_gw" targetRef="a_backlog" />
+    <bpmn:sequenceFlow id="Flow_D00_14" name="Decline" sourceRef="a_gw" targetRef="a_declined" />
+    <bpmn:sequenceFlow id="Flow_D00_15" sourceRef="a_backlog" targetRef="po_review" />
+    <bpmn:sequenceFlow id="Flow_D00_16" sourceRef="po_review" targetRef="po_order" />
+    <bpmn:sequenceFlow id="Flow_D00_17" sourceRef="po_order" targetRef="t_refine" />
+    <bpmn:sequenceFlow id="Flow_D00_18" sourceRef="t_refine" targetRef="t_ready" />
+    <bpmn:textAnnotation id="n_epic"><bpmn:text>Draft Epic is created on the PO's behalf at intake and completed at backlog generation</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="n_manual"><bpmn:text>Human Scrum event: not automated. The pipeline only prepares the input.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="n_optional"><bpmn:text>Documents can be skipped for any verdict and published once, at any time; the flow never waits for a publish. Approve needs the documents published; the deck stays optional.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="Assoc_D00_1" associationDirection="None" sourceRef="a_intake" targetRef="n_epic" />
+    <bpmn:association id="Assoc_D00_2" associationDirection="None" sourceRef="t_refine" targetRef="n_manual" />
+    <bpmn:association id="Assoc_D00_3" associationDirection="None" sourceRef="a_docs" targetRef="n_optional" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_D00" name="00 Overview">
+    <bpmndi:BPMNPlane id="Plane_D00" bpmnElement="Collaboration_D00">
+      <bpmndi:BPMNShape id="Participant_D00_client_di" bpmnElement="Participant_D00_client" isHorizontal="true"><dc:Bounds x="40" y="40" width="2500" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_D00_org_di" bpmnElement="Participant_D00_org" isHorizontal="true"><dc:Bounds x="40" y="216" width="2500" height="630" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D00_ai_di" bpmnElement="Lane_D00_ai" isHorizontal="true"><dc:Bounds x="70" y="216" width="2470" height="270" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D00_po_di" bpmnElement="Lane_D00_po" isHorizontal="true"><dc:Bounds x="70" y="486" width="2470" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D00_team_di" bpmnElement="Lane_D00_team" isHorizontal="true"><dc:Bounds x="70" y="606" width="2470" height="240" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_D00_atl_di" bpmnElement="Participant_D00_atl" isHorizontal="true"><dc:Bounds x="40" y="902" width="2500" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_start_di" bpmnElement="c_start"><dc:Bounds x="187" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="160" y="122" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_describe_di" bpmnElement="c_describe"><dc:Bounds x="310" y="60" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_answer_di" bpmnElement="c_answer"><dc:Bounds x="480" y="60" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_receive_di" bpmnElement="c_receive"><dc:Bounds x="1207" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1180" y="36" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_decide_di" bpmnElement="c_decide"><dc:Bounds x="1330" y="60" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="c_end_di" bpmnElement="c_end"><dc:Bounds x="1547" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1523" y="122" width="85" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_start_di" bpmnElement="a_start"><dc:Bounds x="357" y="288" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="330" y="328" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_intake_di" bpmnElement="a_intake"><dc:Bounds x="480" y="266" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_analysis_di" bpmnElement="a_analysis"><dc:Bounds x="650" y="266" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_estimate_di" bpmnElement="a_estimate"><dc:Bounds x="820" y="266" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_docs_di" bpmnElement="a_docs"><dc:Bounds x="990" y="266" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_present_di" bpmnElement="a_present"><dc:Bounds x="1160" y="266" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_decision_di" bpmnElement="a_decision"><dc:Bounds x="1377" y="288" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1350" y="328" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_gw_di" bpmnElement="a_gw" isMarkerVisible="true"><dc:Bounds x="1540" y="281" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1484" y="269" width="60" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_backlog_di" bpmnElement="a_backlog"><dc:Bounds x="1670" y="266" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="a_declined_di" bpmnElement="a_declined"><dc:Bounds x="1547" y="408" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1520" y="448" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="po_review_di" bpmnElement="po_review"><dc:Bounds x="1840" y="506" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="po_order_di" bpmnElement="po_order"><dc:Bounds x="2010" y="506" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_refine_di" bpmnElement="t_refine"><dc:Bounds x="2180" y="626" width="130" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_ready_di" bpmnElement="t_ready"><dc:Bounds x="2397" y="648" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="2370" y="688" width="90" height="42" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_epic_di" bpmnElement="n_epic"><dc:Bounds x="795" y="398" width="180" height="56" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_manual_di" bpmnElement="n_manual"><dc:Bounds x="2315" y="761" width="200" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="n_optional_di" bpmnElement="n_optional"><dc:Bounds x="976" y="388" width="260" height="76" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_D00_1_di" bpmnElement="Flow_D00_1"><di:waypoint x="223" y="100" /><di:waypoint x="310" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_2_di" bpmnElement="Flow_D00_2"><di:waypoint x="440" y="100" /><di:waypoint x="480" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_3_di" bpmnElement="Flow_D00_3"><di:waypoint x="610" y="100" /><di:waypoint x="1207" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_4_di" bpmnElement="Flow_D00_4"><di:waypoint x="1243" y="100" /><di:waypoint x="1330" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_5_di" bpmnElement="Flow_D00_5"><di:waypoint x="1460" y="100" /><di:waypoint x="1547" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_6_di" bpmnElement="Flow_D00_6"><di:waypoint x="393" y="306" /><di:waypoint x="480" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_7_di" bpmnElement="Flow_D00_7"><di:waypoint x="610" y="306" /><di:waypoint x="650" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_8_di" bpmnElement="Flow_D00_8"><di:waypoint x="780" y="306" /><di:waypoint x="820" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_9_di" bpmnElement="Flow_D00_9"><di:waypoint x="950" y="306" /><di:waypoint x="990" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_10_di" bpmnElement="Flow_D00_10"><di:waypoint x="1120" y="306" /><di:waypoint x="1160" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_11_di" bpmnElement="Flow_D00_11"><di:waypoint x="1290" y="306" /><di:waypoint x="1377" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_12_di" bpmnElement="Flow_D00_12"><di:waypoint x="1413" y="306" /><di:waypoint x="1540" y="306" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_13_di" bpmnElement="Flow_D00_13"><di:waypoint x="1590" y="306" /><di:waypoint x="1670" y="306" /><bpmndi:BPMNLabel><dc:Bounds x="1598" y="288" width="48" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_14_di" bpmnElement="Flow_D00_14"><di:waypoint x="1565" y="331" /><di:waypoint x="1565" y="408" /><bpmndi:BPMNLabel><dc:Bounds x="1571" y="337" width="48" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_15_di" bpmnElement="Flow_D00_15"><di:waypoint x="1800" y="306" /><di:waypoint x="1820" y="306" /><di:waypoint x="1820" y="546" /><di:waypoint x="1840" y="546" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_16_di" bpmnElement="Flow_D00_16"><di:waypoint x="1970" y="546" /><di:waypoint x="2010" y="546" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_17_di" bpmnElement="Flow_D00_17"><di:waypoint x="2140" y="546" /><di:waypoint x="2160" y="546" /><di:waypoint x="2160" y="666" /><di:waypoint x="2180" y="666" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D00_18_di" bpmnElement="Flow_D00_18"><di:waypoint x="2310" y="666" /><di:waypoint x="2397" y="666" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_1_di" bpmnElement="Message_D00_1"><di:waypoint x="375" y="140" /><di:waypoint x="375" y="288" /><bpmndi:BPMNLabel><dc:Bounds x="279" y="174" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_2_di" bpmnElement="Message_D00_2"><di:waypoint x="523" y="266" /><di:waypoint x="523" y="140" /><bpmndi:BPMNLabel><dc:Bounds x="432" y="181" width="85" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_3_di" bpmnElement="Message_D00_3"><di:waypoint x="567" y="140" /><di:waypoint x="567" y="266" /><bpmndi:BPMNLabel><dc:Bounds x="573" y="181" width="48" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_4_di" bpmnElement="Message_D00_4"><di:waypoint x="1225" y="266" /><di:waypoint x="1225" y="118" /><bpmndi:BPMNLabel><dc:Bounds x="1231" y="174" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_5_di" bpmnElement="Message_D00_5"><di:waypoint x="1395" y="140" /><di:waypoint x="1395" y="288" /><bpmndi:BPMNLabel><dc:Bounds x="1401" y="181" width="54" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_6_di" bpmnElement="Message_D00_6"><di:waypoint x="545" y="346" /><di:waypoint x="545" y="902" /><bpmndi:BPMNLabel><dc:Bounds x="551" y="867" width="66" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_7_di" bpmnElement="Message_D00_7"><di:waypoint x="715" y="902" /><di:waypoint x="715" y="346" /><bpmndi:BPMNLabel><dc:Bounds x="721" y="860" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_8_di" bpmnElement="Message_D00_8"><di:waypoint x="1055" y="346" /><di:waypoint x="1055" y="902" /><bpmndi:BPMNLabel><dc:Bounds x="1061" y="860" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_9_di" bpmnElement="Message_D00_9"><di:waypoint x="1735" y="346" /><di:waypoint x="1735" y="902" /><bpmndi:BPMNLabel><dc:Bounds x="1741" y="860" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_10_di" bpmnElement="Message_D00_10"><di:waypoint x="1905" y="586" /><di:waypoint x="1905" y="902" /><bpmndi:BPMNLabel><dc:Bounds x="1911" y="860" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_D00_11_di" bpmnElement="Message_D00_11"><di:waypoint x="2245" y="706" /><di:waypoint x="2245" y="902" /><bpmndi:BPMNLabel><dc:Bounds x="2251" y="860" width="90" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D00_1_di" bpmnElement="Assoc_D00_1"><di:waypoint x="575" y="346" /><di:waypoint x="795" y="426" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D00_2_di" bpmnElement="Assoc_D00_2"><di:waypoint x="2275" y="706" /><di:waypoint x="2315" y="786" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_D00_3_di" bpmnElement="Assoc_D00_3"><di:waypoint x="1085" y="346" /><di:waypoint x="1085" y="388" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

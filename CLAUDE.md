@@ -2,7 +2,7 @@
 
 AI pipeline that does PM work for a Scrum game project (endless runner). A client describes a feature in a chat UI. The pipeline asks a discovery questionnaire, analyzes requirements, estimates effort, budget, value and risk, publishes PM documents to Confluence, presents the result to the client, and creates the Epic and user stories in Jira.
 
-Design documents live **outside this repository**, in `../docs/`: the delivery plan (`IMPLEMENTATION_PLAN.md`, read it before a new phase), the phase history (`PROJECT_STATUS.md`) and the BPMN models (`bpmn/viewer.html`).
+Design documents live **inside this repository**, in `./docs/`: the delivery plan (`IMPLEMENTATION_PLAN.md`, read it before a new phase), the phase history (`PROJECT_STATUS.md`) and the BPMN models (`bpmn/viewer.html`).
 
 Folders with their own `CLAUDE.md` (loaded when you work there): `apps/server/src/pipeline-engine`, `apps/web`, `agents`, `skills`, `config`.
 
@@ -51,7 +51,7 @@ Slash commands: `/rebuild` (build, restart, health), `/eval` (in-memory eval, de
 
 ## Status
 
-All phases are done (0–8). Phase 8 (hardening and demo): record/replay of Claude answers (`agents/cassette.ts`, `evals/cassettes/`), an end-to-end test of the whole pipeline in dry-run (`src/e2e`, approve and decline, real Postgres, fake read-only Atlassian), eval v2 graders in code (`evals/graders.ts`: requirement coverage, INVEST lint) with `--record`/`--replay`, the read-only live smoke test (`evals/smoke-cli.ts`), the Run log on System status, client text fenced for every agent (`CLIENT_TEXT_RULE`), wider log redaction, a fix for jobs dropped while the run lock was held, GitHub Actions CI, the README and `DEMO.md`. The wiring of every stage lives in `src/pipeline.ts` (`createPipeline`). One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `../docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~10 Claude calls and ~400k tokens, the backlog builder included).
+All phases are done (0–8). Phase 8 (hardening and demo): record/replay of Claude answers (`agents/cassette.ts`, `evals/cassettes/`), an end-to-end test of the whole pipeline in dry-run (`src/e2e`, approve and decline, real Postgres, fake read-only Atlassian), eval v2 graders in code (`evals/graders.ts`: requirement coverage, INVEST lint) with `--record`/`--replay`, the read-only live smoke test (`evals/smoke-cli.ts`), the Run log on System status, client text fenced for every agent (`CLIENT_TEXT_RULE`), wider log redaction, a fix for jobs dropped while the run lock was held, GitHub Actions CI, the README and `DEMO.md`. The wiring of every stage lives in `src/pipeline.ts` (`createPipeline`). One-agent evals (one Claude call each): `node apps/server/dist/evals/writer-cli.js --run <id>` (writer), `… --presenter` (presenter) and `node apps/server/dist/evals/backlog-cli.js --run <id>` (backlog builder plus a dry-run of the Jira write; `--show` prints the Epic and a story, `--fresh` ignores the cached draft). History and demo details: `./docs/PROJECT_STATUS.md`. Evals: run only `rewarded-menu-chest` by default; keep `double-jump` in the eval set without running it; others only on request (each feature costs ~10 Claude calls and ~400k tokens, the backlog builder included).
 
 ## Current Focus
 
@@ -60,7 +60,7 @@ Updated 2026-11-08. Read this before starting work in a new chat.
 ### Where we are
 
 - **Done:** every phase (0–8); check `git log` for the Phase 8 commit. No further phase is planned.
-- **Next:** the user tests the pipeline live by hand, acting as the client ([DEMO.md](DEMO.md)); they chose to do that themselves rather than have it scripted. Help with what they find; ask before anything that writes to Atlassian.
+- **Next: end-user documentation** (a user guide and README screenshots/GIF). Read `./docs/HANDOFF-documentation.md` first: scope, the runs to use for screenshots, and the rules (read only in the app; no Claude calls; ask before commits). The app itself is complete; the user tests it by hand ([DEMO.md](DEMO.md)).
 - **CI** (`.github/workflows/ci.yml`) runs lint, typecheck, tests with the e2e replay against a Postgres service, the build and a Docker build. A change that adds or reorders agent calls breaks the e2e replay: re-record `evals/cassettes/rewarded-menu-chest.json` (delete it, then `E2E_RECORD=1` with `E2E_DATABASE_URL`; Claude runs inside the app container, ~11 calls). Locally: `docker run -d --rm --name aipm-e2e-pg -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e -p 55432:5432 postgres:17-alpine`.
 - **Write mode is live** (`ATLASSIAN_WRITE_MODE=live`, set by the user). Every publish writes to the real Confluence space `AIPMconf` and Jira project `AIPM`. Ask before any action that writes something new.
 - **Demo run** `4b5ea878-fb47-48da-859a-73e8c2a1530c` (rewarded-menu-chest, title "Add a free gift chest to the main menu"): verdict Go, documents published live as FA-1 (Feature Brief v3 "… (AIPM-28)" with the deck embedded and the approval, Requirements Specification, Estimation & Release Forecast, Roadmap Update Proposal, blocks on the Risk Register, Assumption Log and Initial Product Backlog), deck v1.1 attached to the Brief as `FA-1 Feature Proposal.pptx`. **Approved live on 2026-11-07 and `completed`:** Epic AIPM-28 with Stories AIPM-29…AIPM-41 in Jira as an AI draft. Its chat history is one block per step; keep it that way. Re-running its backlog stage would only update the same issues, but ask first: it writes to Jira.
@@ -107,6 +107,6 @@ Updated 2026-11-08. Read this before starting work in a new chat.
 
 ### Working notes
 
-- The design docs (`../docs`) are outside the repository and are not committed; `PROJECT_STATUS.md` there has the full history.
+- The design docs (`./docs`) are inside the repository and are committed; `PROJECT_STATUS.md` there has the full history.
 - Read-only database checks: write the SQL to a file in the scratchpad and pipe it into `docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'`; long inline `psql -c` commands are refused by the permission rules, and so is reading `node_modules`.
 - In Node edit scripts, `$` in a `String.replace` replacement (`` $` ``, `$&`) is a special pattern and backslashes get lost in heredocs: prefer the Edit tool for code that contains template literals or regexes.
