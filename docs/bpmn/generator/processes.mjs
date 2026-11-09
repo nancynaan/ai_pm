@@ -16,7 +16,6 @@ const rule = node('businessRuleTask');
 const call = node('callActivity');
 const xor = node('exclusiveGateway');
 const and = node('parallelGateway');
-const evgw = node('eventBasedGateway');
 
 const CLIENT = { id: 'client', name: 'Client (feature sponsor)' };
 const ATL = { id: 'atl', name: 'Atlassian Cloud: Jira & Confluence (REST API)', collapsed: true };
