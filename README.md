@@ -2,7 +2,7 @@
 
 > **Using the app as a client?** Read the [user guide](USER_GUIDE.md). This README is for whoever sets up and runs the app.
 
-<img src="docs/images/app-interface.webp" alt="An animated tour of the AI PM app interface" width="800">
+<img src="docs/images/app-interface.webp" alt="An animated tour of the AI PM app interface" width="550">
 
 An AI pipeline that does project-management work for a Scrum game project (an endless runner). A client describes a new feature in a chat UI, and the pipeline:
 
