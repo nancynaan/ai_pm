@@ -29,11 +29,17 @@ Open the app in your browser. The home page has:
 
 Click **AI PM** at the top left to come back here from anywhere.
 
+The app follows your computer's light or dark setting. The screenshots in this guide show the dark theme.
+
+<img src="docs/images/home.png" alt="The home page: the new feature request box and the recent requests" width="720">
+
 ## Step by step
 
 When you open a feature, the step bar at the top shows where it is: **Intake, Discovery, Analysis, Estimation, Documents, Presentation, Backlog**. A step turns green when it is done.
 
 While the AI works, the chat ends with a **"please wait"** card that says what is happening. You can leave the page and come back later; the work goes on without you.
+
+<img src="docs/images/chat-approved.png" alt="A feature screen: the step bar with every step green, and the client request" width="720">
 
 ### 1. Describe the feature
 
@@ -64,6 +70,8 @@ The AI PM checks your answers for gaps and contradictions, then shows a report:
 - what is **confirmed by you**, what is **your assumption**, what is an **AI hypothesis**, and what is **missing**;
 - a confidence level.
 
+<img src="docs/images/discovery-report.png" alt="The Discovery Completeness Report: coverage per area, contradictions and gaps" width="520">
+
 If something important is unclear or contradictory, you get a short **clarification** round with a few extra questions. If something still blocks the assessment after that, the AI PM asks **How do you want to continue?**:
 
 - **Continue with a preliminary assessment**: the open points are filled with documented assumptions, and every figure that depends on them is marked preliminary;
@@ -74,6 +82,8 @@ If something important is unclear or contradictory, you get a short **clarificat
 Nothing to do here. The AI PM analyses the requirements and their impact, then estimates the feature. This takes about five minutes.
 
 The **Assessment ready** card shows the verdict and the headline figures: delivery dates, cost, return on investment and the number of risks. Press **Open the Analysis tab** for the full picture (see [The tabs](#the-tabs-of-a-feature)).
+
+<img src="docs/images/assessment-ready.png" alt="The Assessment ready card with the verdict Go and the headline figures" width="520">
 
 ### 5. Documents
 
@@ -93,6 +103,8 @@ You have three buttons:
 
 Each button disappears once its step is done. There is no second generation and no re-publish.
 
+<img src="docs/images/documents-card.png" alt="The Documents card: six documents generated, not published yet, and the Publish to Confluence button" width="520">
+
 ### 6. The proposal
 
 The **Proposal** card holds a three-slide presentation:
@@ -107,12 +119,18 @@ It shows dates and money as ranges, marks every slide **preliminary** and "not a
 - **Download PPTX** saves a PowerPoint file.
 - **Publish to Confluence** (optional) attaches the presentation to the Feature Brief and shows it on that page. It is available once, after the documents are published.
 
+<img src="docs/images/proposal-card.png" alt="The Proposal card with View slides and Download PPTX" width="520">
+
+<img src="docs/images/slides.png" alt="The slide viewer showing slide 1, the business opportunity" width="720">
+
 ### 7. Decide
 
 The AI PM writes _"Here is the assessment summary. Do you want to go ahead with this feature?"_ with the key figures. Below it is the decision card: an optional comment for the team, **Decline** and **Approve**.
 
 - **Approve** needs the documents published. Until they are, the button is locked and shows _"Publish the documents to proceed."_ If you click it anyway, the chat tells you what to do: generate and publish the documents, or only publish them. You can do that on the Documents card or the Documents tab, then press **Approve** again.
 - **Decline** works at any time, with or without documents.
+
+<img src="docs/images/approve-locked.png" alt="The decision card: Approve is locked with the hint Publish the documents to proceed" width="520">
 
 The decision is final for this request. If you want a changed version of the feature, start a new request.
 
@@ -127,6 +145,8 @@ The decision is final for this request. If you want a changed version of the fea
 - A **Backlog** tab appears on the feature with the Epic and every story.
 - The step bar turns all green, the status reads **Approved**, and the conversation closes.
 
+<img src="docs/images/backlog-card.png" alt="The Backlog card after approval: the Epic and its 13 stories in Jira as an AI draft" width="520">
+
 The Product Owner then reviews and orders the stories, and the team refines and estimates them in Backlog Refinement.
 
 ### After you decline
@@ -134,6 +154,8 @@ The Product Owner then reviews and orders the stories, and the team refines and 
 - Your decision is recorded on the Feature Brief and the Assumption Log, if they are published.
 - The draft Epic in Jira is closed. Nothing goes to the backlog.
 - The Backlog step turns red, the status reads **Declined**, and the conversation closes.
+
+<img src="docs/images/declined.png" alt="A declined feature: the Backlog step is red and the status reads Declined" width="600">
 
 ## The tabs of a feature
 
@@ -152,6 +174,14 @@ The dark bar at the top of a feature has these tabs:
 - **Presentation**: the slide viewer and the PowerPoint download.
 - **Backlog**: the Epic and its stories in Jira. It appears only after an approval.
 
+The top of the **Analysis** tab: the headline figures, the verdict and the planning inputs.
+
+<img src="docs/images/analysis.png" alt="Analysis tab: headline figures, verdict and planning inputs" width="720">
+
+Further down, each section pairs a chart with a table, here the release forecast:
+
+<img src="docs/images/analysis-forecast.png" alt="Analysis tab: the release forecast chart with P50 and P85 and its table" width="720">
+
 ## System status
 
 **System status** shows:
@@ -159,6 +189,8 @@ The dark bar at the top of a feature has these tabs:
 - **Health checks**: whether the app can reach its database, Jira, Confluence and Claude (the AI). Everything should read OK. If a check fails, tell your administrator.
 - **Project baseline · Comet Run**: the project documents the AI PM reads before it assesses a feature (business case, roadmap, team and velocity, risk register and others), with links to Confluence.
 - **Run log**: every feature with its steps, how long each took, and how much AI work it used.
+
+<img src="docs/images/status.png" alt="System status: every health check reads OK" width="600">
 
 ## Good to know
 
