@@ -67,7 +67,13 @@ export function createDocumentRepository(db: Db) {
         .where(eq(documentSets.runId, runId));
     },
 
-    async saveDocuments(runId: string, rows: DocumentRecord[], mode: 'dry-run' | 'live') {
+    /** Saves the rows; `published` marks the set as published (a generate-only save does not). */
+    async saveDocuments(
+      runId: string,
+      rows: DocumentRecord[],
+      mode: 'dry-run' | 'live',
+      { published }: { published: boolean },
+    ) {
       const now = new Date();
       await db.transaction(async (tx) => {
         for (const row of rows) {
@@ -81,7 +87,7 @@ export function createDocumentRepository(db: Db) {
         }
         await tx
           .update(documentSets)
-          .set({ writeMode: mode, publishedAt: now, updatedAt: now })
+          .set(published ? { writeMode: mode, publishedAt: now, updatedAt: now } : { updatedAt: now })
           .where(eq(documentSets.runId, runId));
       });
     },

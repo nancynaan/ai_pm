@@ -49,23 +49,23 @@ Nothing to do: the requirements, impact, estimate, value and risk agents run one
 
 **Expect:** an assessment card in the chat with the verdict (Go, Go with conditions or No-Go) and a link to the **Analysis** tab. There: the story map, the release forecast (P50/P85 dates), budget, business value scenarios and ROI, risks and the change magnitude, each with a chart and a table. Every number is computed in code; the agents only give judgements. On a phone, the wide tables scroll sideways with the first column pinned.
 
-## 4. Publish the documents (~3–4 minutes)
+## 4. Generate the documents (~3–4 minutes)
 
-On the Documents card under the assessment, press **Generate and publish to Confluence**.
+On the Documents card under the assessment, press **Generate documents** (green). There is also **Skip for now**, for any verdict, which goes straight to the proposal; you can decline without documents, but to approve you will have to generate and publish them first (still possible at the decision).
 
-**Expect:** one writer call, then the table fills in: Feature Brief, Requirements Specification, Estimation & Release Forecast, the feature's blocks on the Risk Register and Assumption Log, and a Roadmap Update Proposal only if the roadmap changes. Each row has **Open in Confluence** and **Preview**. In Confluence: a new FA-n page tree under Feature Assessments.
+**Expect:** "Please wait, the documents are generating" on the card, one writer call, then the table: Feature Brief, Requirements Specification, Estimation & Release Forecast, the feature's entries for the Risk Register and Assumption Log, and a Roadmap Update Proposal only if the roadmap changes, each "Generated, not published yet" with a **Preview**. A message says you can publish them anytime, and the run moves on to the proposal by itself.
 
-Pressing the button again rewrites the same pages (no duplicates) and makes no Claude call while the assessment is unchanged.
+**Publish to Confluence** (green once the documents exist; "Required to approve" under it) works once, at any time, even after the decision: a new FA-n page tree under Feature Assessments, the blocks on the shared pages and an **Open in Confluence** link per row. Each button disappears once its step is done.
 
 ## 5. The proposal (~1 minute)
 
-**Expect:** a Proposal card and the **Presentation** tab with exactly three slides (business opportunity; solution & scope; delivery feasibility & recommendation). There are no story points, only date and money ranges marked preliminary and "not a delivery commitment". The PPTX downloads from the tab and is attached to the Feature Brief and embedded in it.
+**Expect:** a Proposal card and the **Presentation** tab with exactly three slides (business opportunity; solution & scope; delivery feasibility & recommendation). There are no story points, only date and money ranges marked preliminary and "not a delivery commitment". The PPTX downloads from the card and the tab. **Publish to Confluence** on the card is optional: greyed out until the documents are published, then once; it attaches the PPTX to the Feature Brief, embeds it there and shows the Confluence link. While the deck is prepared, the chat shows a "please wait" card.
 
 Then the question "Here is the assessment summary…" and the decision card.
 
 ## 6. Decide (~1 minute, or ~2 minutes with Approve)
 
-**Approve:**
+**Approve:** only with the documents published. Otherwise the button is locked (hover: "Publish the documents to proceed."), and a click gets a chat message asking you to generate and publish them, or only publish; do that on the Documents card (or tab) and press Approve again.
 
 - One backlog-builder call, then the Epic and one story per story-map item go to Jira as an **AI draft**: To Do, label `ai-draft`, no sprint, Story Points empty, a proposed priority "pending PO review", an `AI estimate (SP)`, Gherkin acceptance criteria and `Blocks` links.
 - The Backlog card gives the Epic link and every story with its key. A **Backlog** tab appears.

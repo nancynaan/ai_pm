@@ -3,9 +3,10 @@ import type { Publisher } from '../../sync/publisher.js';
 import type { RunRecord } from '../repository.js';
 import { type DocumentInputDeps, loadDocumentInputs } from './load.js';
 import type { DocumentPublisher } from './publish.js';
-import { renderDocuments } from './render.js';
+import { type Links, renderDocuments } from './render.js';
 import type { DocumentRecord, DocumentRepository } from './repository.js';
 import type { Templates } from './templates.js';
+import { checkRendered } from './validate.js';
 
 export interface RepublishDeps extends DocumentInputDeps {
   documents: DocumentInputDeps['documents'] &
@@ -22,19 +23,40 @@ export interface DecisionLogDeps extends RepublishDeps {
 /**
  * Renders the published documents again from the stored draft (no Claude call) and rewrites
  * them in place, so they show what happened since: the client's decision, the Epic and its
- * backlog. Returns null when the documents were never published.
+ * backlog, the published deck. Returns null when the documents were never published: the
+ * client's choice, which a later step never overrides.
  */
 export async function republishDocuments(
   deps: RepublishDeps,
   run: RunRecord,
 ): Promise<{ faNumber: number; mode: DocumentPublisher['mode'] } | null> {
   const set = await deps.documents.setOf(run.id);
+  if (!set?.publishedAt) return null;
+  return publishStoredDocuments(deps, run);
+}
+
+/**
+ * Publishes the generated documents from the stored draft (no Claude call): the client's
+ * "Publish to Confluence", and every later update of pages already published. Returns null
+ * when nothing was generated.
+ */
+export async function publishStoredDocuments(
+  deps: RepublishDeps,
+  run: RunRecord,
+): Promise<{
+  faNumber: number;
+  mode: DocumentPublisher['mode'];
+  results: { type: string; status: string }[];
+} | null> {
+  const set = await deps.documents.setOf(run.id);
   const draft = DocumentDraft.safeParse(set?.draft);
-  if (!set || !draft.success || !set.publishedAt) return null;
+  if (!set || !draft.success) return null;
   const inputs = await loadDocumentInputs(deps, run, set.faNumber);
-  const { docs, results } = await deps.publisher.publish(inputs, (links) =>
-    renderDocuments(inputs, draft.data, deps.templates, links),
-  );
+  const render = (links: Links) => renderDocuments(inputs, draft.data, deps.templates, links);
+  // The same check as at generation: nothing goes to Confluence that fails it.
+  const problems = checkRendered(render(await deps.publisher.knownLinks(run.id)), inputs);
+  if (problems.length) throw new Error(`The document check failed: ${problems.slice(0, 3).join('; ')}`);
+  const { docs, results } = await deps.publisher.publish(inputs, render);
   const previous = await deps.documents.documentsOf(run.id);
   const rows: DocumentRecord[] = docs.map((doc) => {
     const r = results.find((x) => x.type === doc.type);
@@ -51,8 +73,12 @@ export async function republishDocuments(
       note: r?.note ?? null,
     };
   });
-  await deps.documents.saveDocuments(run.id, rows, deps.publisher.mode);
-  return { faNumber: set.faNumber, mode: deps.publisher.mode };
+  await deps.documents.saveDocuments(run.id, rows, deps.publisher.mode, { published: true });
+  return {
+    faNumber: set.faNumber,
+    mode: deps.publisher.mode,
+    results: results.map((r) => ({ type: r.type, status: r.status })),
+  };
 }
 
 /**

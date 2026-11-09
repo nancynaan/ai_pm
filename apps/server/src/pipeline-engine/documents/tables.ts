@@ -151,6 +151,8 @@ export interface TableContext {
     /** The Jira Epic and the Initial Product Backlog page, once the backlog is in Jira. */
     epic?: string | null;
     initialBacklog?: string | null;
+    /** The client deck is attached to the Feature Brief (the client published it). */
+    deck?: boolean;
   };
 }
 

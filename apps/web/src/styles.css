@@ -1276,10 +1276,9 @@ table.risks td {
   }
 }
 
+/* The Preview and Confluence link cells stay on one line. */
 .documents td.links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+  white-space: nowrap;
 }
 
 .documents .tag {
@@ -1940,4 +1939,131 @@ main.wide {
   backdrop-filter: blur(4px);
   -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
   mask-image: linear-gradient(to bottom, #000, transparent);
+}
+
+/* ==== Waiting placeholders, the documents' two buttons, optional publishes ==== */
+
+:root {
+  /* A greyed-out go-ahead button that cannot be used yet (text >= 4.5:1). */
+  --locked-bg: #cfcac1;
+  --locked-text: #363b3c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --locked-bg: #4a5454;
+    --locked-text: #dde3e1;
+  }
+}
+
+/* "Please wait" with three quiet dots; the card stands where the step's result will appear. */
+.waiting {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  color: var(--muted);
+}
+.dots {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: wait-dot 1.2s ease-in-out infinite;
+}
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes wait-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dots span {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+.card.pending h3 {
+  color: var(--muted);
+}
+
+/* The documents card: Generate (white), then Publish (grey → green → "Published"). */
+.doc-actions {
+  gap: 10px 12px;
+  align-items: flex-start;
+}
+button.light {
+  background: #ffffff;
+  color: #1e2a2b;
+}
+button.light:disabled {
+  opacity: 0.7;
+}
+button.go.locked[aria-disabled='true'] {
+  background: var(--locked-bg);
+  color: var(--locked-text);
+  opacity: 1;
+}
+/* Published: still green, no longer clickable. */
+button.go.done:disabled {
+  opacity: 1;
+  cursor: default;
+  box-shadow: none;
+}
+/* The publish button with "Optional" under it, right-aligned. */
+.publish {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.publish .optional {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.documents .skip {
+  margin: 10px 0 0;
+}
+.documents .skip button.link {
+  margin-right: 0;
+  color: var(--ok-text);
+}
+
+/* White link buttons (View slides, Download PPTX), like the white button style. */
+a.button.light {
+  background: #ffffff;
+  color: #1e2a2b;
+}
+
+/* Go-ahead links styled as buttons (Open the Analysis tab, Open the Epic in Jira). */
+a.button.go {
+  background: var(--go-bg);
+  color: #ffffff;
+  border-color: transparent;
+}
+a.button.go:hover {
+  background: var(--go-bg-hover);
+}
+
+/* Links in the AI's messages (e.g. the Epic in Jira) read as go-ahead green. */
+.bubble.ai a {
+  color: var(--ok-text);
 }

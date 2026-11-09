@@ -96,7 +96,7 @@ export function BacklogCard({ runId, version = '' }: { runId: string; version?: 
           </a>
         )}
         {epic?.url && (
-          <a className="button primary" href={epic.url} target="_blank" rel="noreferrer">
+          <a className="button go" href={epic.url} target="_blank" rel="noreferrer">
             Open the Epic in Jira
           </a>
         )}

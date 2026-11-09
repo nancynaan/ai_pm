@@ -54,9 +54,9 @@ async function demo(feature: EvalFeature): Promise<{ run: RunSummary; assessment
       await call(`/api/runs/${runId}/discovery-decision`, z.object({ ok: z.boolean() }), { proceed: true });
       console.log('  accepted a preliminary assessment');
     } else if (run.state === 'awaiting_documents') {
-      // The client presses "Generate and publish to Confluence" (dry-run unless the app is live).
+      // The client presses "Generate documents"; publishing stays optional and is not done here.
       await call(`/api/runs/${runId}/documents`, z.object({ ok: z.boolean() }), {});
-      console.log('  published the documents');
+      console.log('  generated the documents');
     } else if (STOP_STATES.has(run.state)) {
       const assessment = await call(`/api/runs/${runId}/assessment`, assessmentSchema).catch(() => null);
       return { run, assessment };

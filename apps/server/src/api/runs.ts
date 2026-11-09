@@ -18,6 +18,7 @@ import type { BacklogRepository } from '../pipeline-engine/backlog/repository.js
 import { needsRoadmapProposal } from '../pipeline-engine/calculators/baseline.js';
 import type { DocumentRepository } from '../pipeline-engine/documents/repository.js';
 import type { PresentationRepository } from '../pipeline-engine/presentation/repository.js';
+import { isDeckPublished } from '../pipeline-engine/publishing.js';
 import { PPTX_TYPE } from '../pipeline-engine/stages/presenting.js';
 import { deckFileName, deckToPptx } from '../render/pptx.js';
 import type { EventBus } from '../pipeline-engine/events.js';
@@ -100,18 +101,30 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
         deps.assessments?.assessmentOf(id) ?? null,
       ]);
       const roadmapNeeded = assessment ? needsRoadmapProposal(assessment.roadmapImpact) : true;
+      const generated = rows.some((r) => r.markdown.length > 0);
+      const published = !!set?.publishedAt;
+      // These steps write the documents themselves; a publish waits until they end.
+      const writing = run.state === 'documenting' || run.state === 'backlog';
       return {
         runId: id,
         faNumber: set?.faNumber ?? null,
         mode: deps.documents?.mode ?? 'dry-run',
         publishedAt: set?.publishedAt?.toISOString() ?? null,
-        canPublish: run.state === 'awaiting_documents' || run.state === 'awaiting_decision',
-        // After the decision the documents are final; the backlog stage keeps them in step.
-        lockedReason:
-          run.state === 'completed' || run.state === 'backlog'
-            ? "You can't publish again: the feature is already approved, and its documents were published successfully."
-            : run.state === 'declined'
-              ? "You can't publish again: the feature was declined, and its documents record that decision."
+        generated,
+        // At the documents step, or at the decision if they were skipped (Approve needs them).
+        canGenerate: !generated && (run.state === 'awaiting_documents' || run.state === 'awaiting_decision'),
+        // Skipping is offered for any verdict; Approve still needs the documents published.
+        canSkip: run.state === 'awaiting_documents',
+        // Published once, at any time after generating; never again.
+        canPublish: generated && !published && !writing,
+        lockedReason: published
+          ? null
+          : !generated
+            ? run.state === 'documenting'
+              ? 'The documents are being generated; you can publish them once they are ready.'
+              : 'Generate the documents first; then you can publish them to Confluence.'
+            : writing
+              ? 'A step is writing the documents right now; try again in a moment.'
               : null,
         running: run.state === 'documenting',
         documents: DOCUMENT_TYPES.map((type) => {
@@ -150,10 +163,38 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
     }),
   );
 
+  /** "Generate documents": the documents stage runs, then the presentation. */
   app.post('/api/runs/:id/documents', async (request, reply) =>
     handle(reply, async () => {
       const { id } = idParams.parse(request.params);
+      await deps.pipelineEngine.generateDocuments(id);
+      return { ok: true };
+    }),
+  );
+
+  /** "Skip for now" (any verdict): straight to the presentation; Approve still needs the documents. */
+  app.post('/api/runs/:id/documents/skip', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      await deps.pipelineEngine.skipDocuments(id);
+      return { ok: true };
+    }),
+  );
+
+  /** "Publish to Confluence" on the Documents card: once, after generating. */
+  app.post('/api/runs/:id/documents/publish', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
       await deps.pipelineEngine.publishDocuments(id);
+      return { ok: true };
+    }),
+  );
+
+  /** "Publish to Confluence" on the Proposal card: once, after the documents are published. */
+  app.post('/api/runs/:id/presentation/publish', async (request, reply) =>
+    handle(reply, async () => {
+      const { id } = idParams.parse(request.params);
+      await deps.pipelineEngine.publishPresentation(id);
       return { ok: true };
     }),
   );
@@ -185,15 +226,23 @@ export function registerRunRoutes(app: FastifyInstance, deps: RunRouteDeps) {
       const stored = await deps.presentations?.get(id);
       if (!stored) throw new RunActionError('This run has no presentation yet', 404);
       const set = await deps.documents?.repo.setOf(id);
+      const published = isDeckPublished(stored.attachmentStatus);
       return {
         deck: stored.deck,
-        attachment: stored.attachmentStatus
+        attachment: published
           ? {
-              status: stored.attachmentStatus,
+              status: stored.attachmentStatus!,
               url: stored.attachmentUrl,
               fileName: deckFileName(stored.deck, set?.faNumber ?? null),
             }
           : null,
+        // Published once, onto the Feature Brief, so the documents must be published first.
+        canPublish: !published && !!set?.publishedAt,
+        lockedReason: published
+          ? null
+          : set?.publishedAt
+            ? null
+            : 'Publish the documents first: the presentation goes on the Feature Brief in Confluence.',
       };
     }),
   );

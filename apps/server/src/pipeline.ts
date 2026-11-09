@@ -14,14 +14,15 @@ import { createBacklogRepository } from './pipeline-engine/backlog/repository.js
 import { createBacklogWriter } from './pipeline-engine/backlog/write.js';
 import { createContextBuilder } from './pipeline-engine/context.js';
 import { loadDiscoveryConfig } from './pipeline-engine/discovery-config.js';
-import { recordDecision, republishDocuments } from './pipeline-engine/documents/decision.js';
-import { createDocumentPublisher } from './pipeline-engine/documents/publish.js';
+import { recordDecision } from './pipeline-engine/documents/decision.js';
+import { createDocumentPublisher, deckAttachmentKey } from './pipeline-engine/documents/publish.js';
 import { createDocumentRepository } from './pipeline-engine/documents/repository.js';
 import { loadTemplates } from './pipeline-engine/documents/templates.js';
 import { createPipelineEngine, type PipelineEngineOptions } from './pipeline-engine/engine.js';
 import { createEventBus } from './pipeline-engine/events.js';
 import { createPresentationRepository } from './pipeline-engine/presentation/repository.js';
 import type { StageQueue } from './pipeline-engine/queue.js';
+import { createPublishing } from './pipeline-engine/publishing.js';
 import { createRunRepository } from './pipeline-engine/repository.js';
 import { createAgentAsker, createEpicDrafter, type StageServices } from './pipeline-engine/services.js';
 import { analyzingStage } from './pipeline-engine/stages/analyzing.js';
@@ -117,7 +118,7 @@ export function createPipeline(opts: {
     writerVersion: agentVersion(definition('pm-writer'), templates),
   };
 
-  // Stage 05: the three-slide client deck, its PPTX on the Feature Brief, and the decision gate.
+  // Stage 05: the three-slide client deck and the decision gate.
   const jiraPublisher = () =>
     gateway && jiraProjectKey ? createPublisher({ gateway, store, mode: writeMode, jiraProjectKey }) : null;
   const presentationServices = {
@@ -125,17 +126,26 @@ export function createPipeline(opts: {
     documents: repos.documents,
     autoApprove: config.pipeline.clientGateAutoApprove,
     presenterVersion: agentVersion(definition('presenter')),
-    async attach(input: {
-      runId: string;
-      pageId: string;
-      fileName: string;
-      data: Uint8Array;
-      contentHash: string;
-    }) {
+  };
+
+  // The client's optional publishes (documents, then the deck) and every later page update.
+  const republishDeps = {
+    analysis,
+    context: services.context,
+    repo,
+    documents: repos.documents,
+    publisher: documentServices.publisher,
+    templates,
+  };
+  const publishing = createPublishing({
+    pool,
+    republish: republishDeps,
+    presentations: repos.presentations,
+    async attach(input) {
       const publisher = jiraPublisher();
       if (!publisher) return { status: 'skipped', url: null };
       const r = await publisher.upsertAttachment({
-        key: `run:${input.runId}:deck`,
+        key: deckAttachmentKey(input.runId),
         pageId: input.pageId,
         fileName: input.fileName,
         data: input.data,
@@ -150,22 +160,15 @@ export function createPipeline(opts: {
         : (r.url ?? null);
       return { status: r.action.replace(' ', '_'), url };
     },
-  };
+  });
 
   // Stage 06: the approved feature's Epic and stories in Jira, and its block on the Initial Product Backlog.
-  const republishDeps = {
-    analysis,
-    context: services.context,
-    repo,
-    documents: repos.documents,
-    publisher: documentServices.publisher,
-    templates,
-  };
   const backlogServices = {
     repo: repos.backlog,
     documents: repos.documents,
     writer: createBacklogWriter({ gateway, store, mode: writeMode, jiraProjectKey, siteUrl }),
-    republish: (run: Parameters<typeof republishDocuments>[1]) => republishDocuments(republishDeps, run),
+    // Updates the documents only if the client published them.
+    republish: publishing.republish,
     builderVersion: agentVersion(definition('backlog-builder')),
   };
 
@@ -185,16 +188,24 @@ export function createPipeline(opts: {
       backlog: backlogStage({ ...services, backlog: backlogServices }),
     },
     log,
-    // The Decision Log: the decision goes to the Feature Brief and the Assumption Log block.
+    // The Decision Log: the decision goes to the Feature Brief and the Assumption Log block (if
+    // the client published them), under the publish lock like every other page write.
     onDecision: (run, decision) =>
-      recordDecision(
-        {
-          ...republishDeps,
-          closeEpic: (key) =>
-            jiraPublisher()?.ensureStatus(key, 'done') ?? Promise.resolve('no transition' as const),
-        },
-        run,
-        decision,
+      publishing.locked(run.id, () =>
+        recordDecision(
+          {
+            ...republishDeps,
+            closeEpic: (key) =>
+              jiraPublisher()?.ensureStatus(key, 'done') ?? Promise.resolve('no transition' as const),
+          },
+          run,
+          decision,
+        ),
       ),
+    publishing,
+    documentsStatus: async (runId) => {
+      const [set, rows] = await Promise.all([repos.documents.setOf(runId), repos.documents.documentsOf(runId)]);
+      return { generated: rows.some((r) => r.markdown.length > 0), published: !!set?.publishedAt };
+    },
   });
 }

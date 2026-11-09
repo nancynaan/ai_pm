@@ -1,4 +1,5 @@
 import {
+  documentSetSchema,
   type RunState,
   type RunSummary,
   runSummarySchema,
@@ -15,6 +16,7 @@ import { DocumentsCard } from './Documents.js';
 import { PresentationCard } from './Presentation.js';
 import { STATE_LABEL } from './labels.js';
 import { RichText } from './RichText.js';
+import { StepWaitingCard } from './Waiting.js';
 
 /** Position of each state on the 7-step timeline; stages before it are done. */
 const POSITION: Record<RunState, number> = {
@@ -95,10 +97,16 @@ export function RunView({ runId }: { runId: string }) {
   // The Documents card sits below the client's request to publish them, or below the latest
   // assessment until that request exists.
   const documentsAnchorId =
-    [...events].reverse().find((e) => e.key === 'documents.request')?.id ??
+    [...events].reverse().find((e) => e.key === 'documents.request' || e.key === 'documents.request.late')?.id ??
     [...events].reverse().find((e) => e.event.type === 'assessment_ready')?.id;
   // Only the latest decision card takes a decision; earlier ones are history.
   const lastDecisionId = [...events].reverse().find((e) => e.event.type === 'decision_requested')?.id;
+  // A step paused at the usage limit says so on its placeholder card.
+  const lastStage = [...events].reverse().find((e) => e.event.type === 'stage')?.event;
+  const paused =
+    run && lastStage?.type === 'stage' && lastStage.stage === run.state && lastStage.status === 'paused'
+      ? `Paused at the Claude usage limit; it resumes by itself${lastStage.detail ? ` (${lastStage.detail})` : ''}.`
+      : null;
 
   if (error) return <p className="error">Could not load the run: {error}</p>;
   if (!run) return <p className="muted">Loading…</p>;
@@ -128,10 +136,13 @@ export function RunView({ runId }: { runId: string }) {
               run={run}
               lastReportId={lastReportId}
               lastDecisionId={lastDecisionId}
+              docsVersion={docsVersion}
             />
             {stored.id === documentsAnchorId && <DocumentsCard runId={run.id} version={docsVersion} />}
           </Fragment>
         ))}
+        {/* While a step works, a placeholder stands where its result will appear. */}
+        <StepWaitingCard state={run.state} paused={paused} />
         {run.state === 'completed' && (
           <p className="banner ok">
             Approved: the Epic and its stories are in the Product Backlog. This conversation is closed.
@@ -157,11 +168,13 @@ function EventItem({
   run,
   lastReportId,
   lastDecisionId,
+  docsVersion,
 }: {
   stored: StoredRunEvent;
   run: RunSummary;
   lastReportId: number | undefined;
   lastDecisionId: number | undefined;
+  docsVersion: number;
 }) {
   const { event } = stored;
   switch (event.type) {
@@ -210,8 +223,8 @@ function EventItem({
             ))}
           </ul>
           <p className="actions">
-            <a className="button primary" href={`#/runs/${run.id}/analysis`}>
-              Open on the Analysis tab
+            <a className="button go" href={`#/runs/${run.id}/analysis`}>
+              Open the Analysis tab
             </a>
           </p>
         </div>
@@ -223,6 +236,7 @@ function EventItem({
           verdict={event.verdict}
           highlights={event.highlights}
           open={run.state === 'awaiting_decision' && stored.id === lastDecisionId}
+          docsVersion={docsVersion}
         />
       );
     case 'stage':
@@ -233,7 +247,7 @@ function EventItem({
         </p>
       ) : null;
     case 'presentation_ready':
-      return <PresentationCard runId={run.id} label={event.label} />;
+      return <PresentationCard runId={run.id} label={event.label} version={docsVersion} />;
     case 'backlog_ready':
       return <BacklogCard runId={run.id} version={JSON.stringify(event)} />;
     case 'state':
@@ -247,15 +261,26 @@ function DecisionCard({
   verdict,
   highlights,
   open,
+  docsVersion,
 }: {
   runId: string;
   verdict: string;
   highlights: string[];
   open: boolean;
+  docsVersion: number;
 }) {
   const [comment, setComment] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Approve needs the documents in Confluence; rechecked when they change.
+  const [docsPublished, setDocsPublished] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    api(`/api/runs/${runId}/documents`, documentSetSchema)
+      .then((set) => setDocsPublished(set.publishedAt !== null))
+      .catch(() => setDocsPublished(null));
+  }, [runId, open, docsVersion]);
+  const approveLocked = docsPublished === false;
 
   const decide = async (decision: 'approve' | 'decline') => {
     setSending(true);
@@ -266,7 +291,8 @@ function DecisionCard({
         body: JSON.stringify({ decision, comment: comment.trim() || undefined }),
       });
     } catch (err) {
-      setError(errorText(err));
+      // A locked Approve is answered in the chat (what to do first); other errors show here.
+      if (!(decision === 'approve' && approveLocked)) setError(errorText(err));
       setSending(false);
     }
   };
@@ -294,9 +320,28 @@ function DecisionCard({
             <button type="button" className="stop" disabled={sending} onClick={() => void decide('decline')}>
               Decline
             </button>
-            <button type="button" className="go" disabled={sending} onClick={() => void decide('approve')}>
-              Approve
-            </button>
+            {approveLocked ? (
+              // Still clickable, so the chat explains what to do; the hint says it on hover.
+              <span className="hint-wrap">
+                <button
+                  type="button"
+                  className="go locked"
+                  aria-disabled="true"
+                  aria-describedby={`approve-hint-${runId}`}
+                  disabled={sending}
+                  onClick={() => void decide('approve')}
+                >
+                  Approve
+                </button>
+                <span role="tooltip" id={`approve-hint-${runId}`} className="hint">
+                  Publish the documents to proceed.
+                </span>
+              </span>
+            ) : (
+              <button type="button" className="go" disabled={sending} onClick={() => void decide('approve')}>
+                Approve
+              </button>
+            )}
           </div>
         </>
       )}

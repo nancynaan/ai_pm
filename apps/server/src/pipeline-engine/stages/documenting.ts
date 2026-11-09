@@ -19,13 +19,13 @@ export interface DocumentServices {
   writerVersion: string;
 }
 
-const PUBLISHED = new Set(['created', 'updated', 'unchanged']);
-
 /**
- * BPMN 04: the PM documents. Runs when the client presses "Publish documents" (and again for
- * every re-publish). One pm-writer call writes the text of all documents, reused while the
- * assessment is unchanged; code renders tables and figures, the validator checks the draft and
- * the result, and the publisher creates or rewrites the Confluence pages without duplicates.
+ * BPMN 04: the PM documents. Runs when the client presses "Generate documents". One pm-writer
+ * call writes the text of all documents, reused while the assessment is unchanged; code renders
+ * tables and figures and the validator checks the draft and the result. The documents are saved
+ * as generated (with previews) and the run goes on to the presentation. Publishing them to
+ * Confluence is a separate, optional action the client takes once, at any time
+ * (`publishing.ts`).
  */
 export function documentingStage(services: StageServices & { documents: DocumentServices }): StageHandler {
   return async (ctx) => {
@@ -57,53 +57,46 @@ export function documentingStage(services: StageServices & { documents: Document
       await docs.repo.saveDraft(run.id, hash, draft);
     }
 
-    // Check the rendered result before anything goes to Confluence.
+    // Check the rendered result: the same check runs again before a publish.
     const render = (links: Links) => renderDocuments(inputs, draft, docs.templates, links);
-    const problems = checkRendered(render(await docs.publisher.knownLinks(run.id)), inputs);
+    const rendered = render(await docs.publisher.knownLinks(run.id));
+    const problems = checkRendered(rendered, inputs);
     if (problems.length) throw new Error(`The document check failed: ${problems.slice(0, 3).join('; ')}`);
 
-    const { docs: rendered, results } = await docs.publisher.publish(inputs, render);
+    const previous = await docs.repo.documentsOf(run.id);
     const rows: DocumentRecord[] = rendered.map((doc) => {
-      const r = results.find((x) => x.type === doc.type);
+      const old = previous.find((x) => x.type === doc.type);
       return {
         type: doc.type,
         title: doc.title,
         markdown: doc.markdown,
         figures: doc.figures,
-        status: r?.status ?? 'skipped',
-        confluencePageId: r?.pageId ?? null,
-        confluenceVersion: r?.version ?? null,
-        url: r?.url ?? null,
-        note: r?.note ?? null,
+        status: doc.needed ? 'generated' : 'not_needed',
+        confluencePageId: old?.confluencePageId ?? null,
+        confluenceVersion: old?.confluenceVersion ?? null,
+        url: old?.url ?? null,
+        note: doc.needed ? null : 'The feature does not change roadmap commitments',
       };
     });
-    await docs.repo.saveDocuments(run.id, rows, docs.publisher.mode);
+    await docs.repo.saveDocuments(run.id, rows, docs.publisher.mode, { published: false });
+    const generated = rows.filter((r) => r.status === 'generated').length;
 
-    const published = results.filter((r) => PUBLISHED.has(r.status)).length;
-    // Each step shows once in the chat: a re-publish rewrites these in place.
-    await ctx.emit({ type: 'documents', published, mode: docs.publisher.mode }, 'documents.status');
-    const live = docs.publisher.mode === 'live';
+    // Generated late, at the decision (the client skipped them first): back to the decision.
+    const late = !!(await ctx.repo.lastSucceededAt(run.id, 'presenting'));
+    // Each step shows once in the chat: a re-run rewrites these in place.
+    await ctx.emit({ type: 'documents', published: 0, mode: docs.publisher.mode }, 'documents.status');
     await ctx.emit(
       {
         type: 'message',
         role: 'ai',
-        text: live
-          ? `The documents are in Confluence (FA-${set.faNumber}): ${published} published. The Documents card above has the links.`
-          : `Confluence writes are in dry-run mode, so nothing was written. The Documents card above shows what a live publish would do; each document has a preview.`,
+        text: late
+          ? `The documents are ready (FA-${set.faNumber}): ${generated} generated, each with a preview on the Documents card above. Publish them to Confluence from that card; once they are published, you can approve the feature.`
+          : `The documents are ready (FA-${set.faNumber}): ${generated} generated, each with a preview on the Documents card above. You can publish them to Confluence anytime from that card; approving the feature needs them published. Next, I am preparing the proposal.`,
       },
       'documents.result',
     );
 
-    // Always on to the presentation: it reuses an unchanged deck (no Claude call, no new cards)
-    // and keeps the deck and its PPTX in Confluence in step with the documents.
-    const next = 'presenting';
-    return {
-      next,
-      output: {
-        faNumber: set.faNumber,
-        mode: docs.publisher.mode,
-        results: results.map((r) => ({ type: r.type, status: r.status })),
-      },
-    };
+    // On without waiting for a publish.
+    return { next: late ? 'awaiting_decision' : 'presenting', output: { faNumber: set.faNumber, generated } };
   };
 }

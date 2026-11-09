@@ -164,8 +164,17 @@ describe.skipIf(!ADMIN_URL)('pipeline end to end (dry-run, replayed Claude)', ()
     }
   }
 
-  /** Plays the client until the decision gate, then decides. */
-  async function playClient(decision: 'approve' | 'decline') {
+  /**
+   * Plays the client until the decision gate, then decides. With `publish`, the client first
+   * tries to approve (refused: the documents are not published), then publishes the documents and
+   * the deck (dry-run) and decides. With `skip`, they skip the documents, generate them late at
+   * the decision, try to approve (refused: not published yet) and then decide.
+   */
+  async function playClient(
+    decision: 'approve' | 'decline',
+    { publish = false, skip = false }: { publish?: boolean; skip?: boolean } = {},
+  ) {
+    let lateGenerated = false;
     const run = await engine.createRun(feature.description);
     const answered = new Set<string>();
     for (;;) {
@@ -180,8 +189,25 @@ describe.skipIf(!ADMIN_URL)('pipeline end to end (dry-run, replayed Claude)', ()
       } else if (state === 'awaiting_confirmation') {
         await engine.confirmDiscovery(run.id, { proceed: true });
       } else if (state === 'awaiting_documents') {
-        await engine.publishDocuments(run.id);
+        // Nothing to publish yet, and the deck needs the documents in Confluence first.
+        await expect(engine.publishDocuments(run.id)).rejects.toMatchObject({ status: 409 });
+        if (skip) await engine.skipDocuments(run.id);
+        else await engine.generateDocuments(run.id);
       } else if (state === 'awaiting_decision') {
+        // Approve needs published documents: refused, with a chat message saying what to do.
+        await expect(engine.decide(run.id, { decision: 'approve' })).rejects.toMatchObject({ status: 409 });
+        if (skip && !lateGenerated) {
+          lateGenerated = true;
+          await engine.generateDocuments(run.id); // generated late; back to the decision
+          continue;
+        }
+        if (publish) {
+          await expect(engine.publishPresentation(run.id)).rejects.toMatchObject({ status: 409 });
+          await engine.publishDocuments(run.id);
+          await expect(engine.publishDocuments(run.id)).rejects.toMatchObject({ status: 409 }); // once only
+          await engine.publishPresentation(run.id);
+          await expect(engine.publishPresentation(run.id)).rejects.toMatchObject({ status: 409 });
+        }
         await engine.decide(run.id, { decision });
         return { runId: run.id, state: await settle(run.id) };
       } else {
@@ -199,17 +225,22 @@ describe.skipIf(!ADMIN_URL)('pipeline end to end (dry-run, replayed Claude)', ()
   it(
     'approves: assessment, documents, deck and an AI-draft backlog, all planned in dry-run',
     async () => {
-      const { runId, state } = await playClient('approve');
+      const { runId, state } = await playClient('approve', { publish: true });
       expect(state).toBe('completed');
 
       const assessment = await repos.analysis.assessmentOf(runId);
       expect(assessment?.verdict.decision).toBe('go');
       expect(assessment?.preliminary).toBe(false);
 
-      // Documents: rendered and validated by the stage (figures match the database); dry-run only.
+      // Documents: generated and validated (figures match the database), then published once in
+      // dry-run: what a live publish would create, nothing written.
       const documents = await repos.documents.documentsOf(runId);
       expect(documents.filter((d) => d.markdown.length > 0).length).toBeGreaterThanOrEqual(5);
-      for (const d of documents) expect(d.status).not.toMatch(/^(created|updated)$/);
+      // (skipped: the fake site has no seeded Risk Register or Assumption Log page for the blocks.)
+      for (const d of documents) expect(d.status).toMatch(/^(would_create|would_update|not_needed|skipped)$/);
+      expect(documents.find((d) => d.type === 'feature_brief')?.status).toBe('would_create');
+      expect((await repos.documents.setOf(runId))?.publishedAt).not.toBeNull();
+      expect((await repos.presentations.get(runId))?.attachmentStatus).toBe('would_create');
 
       // The deck: exactly three slides, no story points client-facing.
       const deck = await repos.presentations.get(runId);
@@ -244,9 +275,18 @@ describe.skipIf(!ADMIN_URL)('pipeline end to end (dry-run, replayed Claude)', ()
     'declines: the run closes without a backlog',
     async () => {
       cassette.rewind(); // the same client again, answered from the same recording
-      const { runId, state } = await playClient('decline');
+      const { runId, state } = await playClient('decline', { skip: true });
       expect(state).toBe('declined');
       expect(await repos.backlog.backlogOf(runId)).toBeNull();
+      // Skipped, generated late, never published: the decline does not publish them behind the
+      // client's back, and the refused Approve said what was missing.
+      const blocked = (await blocks(runId)).events.find((e) => e.key === 'decision.blocked');
+      expect(JSON.stringify(blocked?.event)).toMatch(/publish the documents to Confluence before you approve/);
+      expect((await blocks(runId)).keys).toContain('documents.request.late');
+      const documents = await repos.documents.documentsOf(runId);
+      for (const d of documents) expect(d.status).toMatch(/^(generated|not_needed)$/);
+      expect((await repos.documents.setOf(runId))?.publishedAt).toBeNull();
+      expect((await repos.presentations.get(runId))?.attachmentStatus ?? null).toBeNull();
       // The Decision Log is written after the click, outside the run lock: wait for its message.
       let closing: StoredRunEvent | undefined;
       for (let i = 0; i < 200 && !closing; i++) {

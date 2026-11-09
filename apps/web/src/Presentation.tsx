@@ -1,6 +1,8 @@
 import { type Deck, type Presentation, presentationSchema } from '@ai-pm/shared';
 import { useEffect, useState } from 'react';
+import { z } from 'zod';
 import { api, errorText } from './api.js';
+import { PublishButton } from './Documents.js';
 import { FeatureTitle } from './FeatureTitle.js';
 
 /**
@@ -229,16 +231,39 @@ export function PresentationView({ runId }: { runId: string }) {
   );
 }
 
-/** The chat card: the deck is ready, with links to the viewer and the PPTX. */
-export function PresentationCard({ runId, label }: { runId: string; label: string }) {
-  // Where the PPTX sits in Confluence (attached to the Feature Brief), once it is uploaded.
-  const [attachment, setAttachment] = useState<Presentation['attachment']>(null);
+/**
+ * The chat card: the deck is ready, with the viewer, the PPTX, and the optional, one-time
+ * "Publish to Confluence" (onto the Feature Brief, so only once the documents are published).
+ * The run does not wait for it: the decision comes right after.
+ */
+export function PresentationCard({ runId, label, version = 0 }: { runId: string; label: string; version?: number }) {
+  const [p, setP] = useState<Presentation | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     api(`/api/runs/${runId}/presentation`, presentationSchema)
-      .then((p) => setAttachment(p.attachment))
-      .catch(() => setAttachment(null));
-  }, [runId, label]);
+      .then(setP)
+      .catch(() => setP(null));
+  }, [runId, label, version, tick]);
 
+  async function publish() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/runs/${runId}/presentation/publish`, z.object({ ok: z.boolean() }), {
+        method: 'POST',
+        body: '{}',
+      });
+      setTick((t) => t + 1);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const attachment = p?.attachment ?? null;
   return (
     <div className="card presentation-ready">
       <div className="card-head">
@@ -247,21 +272,34 @@ export function PresentationCard({ runId, label }: { runId: string; label: strin
       </div>
       <p className="muted">{label}</p>
       {attachment?.url && (
-        <p className="muted">{attachment.fileName} is attached to the Feature Brief in Confluence.</p>
-      )}
-      <p className="actions">
-        {attachment?.url && (
-          <a className="button" href={attachment.url} target="_blank" rel="noreferrer">
-            Open in Confluence
+        <p className="muted">
+          {attachment.fileName} is on the Feature Brief in Confluence:{' '}
+          <a href={attachment.url} target="_blank" rel="noreferrer">
+            open it in Confluence
           </a>
-        )}
-        <a className="button" href={`/api/runs/${runId}/presentation.pptx`}>
-          Download PPTX
-        </a>
-        <a className="button primary" href={`#/runs/${runId}/presentation/slides`}>
+          .
+        </p>
+      )}
+      {error && <p className="error">{error}</p>}
+      <div className="actions doc-actions">
+        <a className="button light" href={`#/runs/${runId}/presentation/slides`}>
           View slides
         </a>
-      </p>
+        <a className="button light" href={`/api/runs/${runId}/presentation.pptx`}>
+          Download PPTX
+        </a>
+        {/* Optional and once: gone after the publish; the decision never waits for it. */}
+        {p && !attachment && (
+          <PublishButton
+            id={`publish-deck-${runId}`}
+            canPublish={p.canPublish}
+            lockedReason={p.lockedReason}
+            busy={busy}
+            note="Optional"
+            onPublish={() => void publish()}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -281,7 +319,7 @@ export function PresentationTab({ runId }: { runId: string }) {
       {label && <PresentationCard runId={runId} label={label} />}
       {missing && (
         <p className="card muted">
-          No presentation yet. It is prepared after the documents are published.
+          No presentation yet. It is prepared after the documents step.
         </p>
       )}
     </>

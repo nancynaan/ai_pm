@@ -53,7 +53,11 @@ export type Deck = z.infer<typeof deckSchema>;
 
 export const presentationSchema = z.object({
   deck: deckSchema,
-  /** The PPTX attached to the Feature Brief in Confluence. */
+  /** The PPTX attached to the Feature Brief in Confluence, once the client published it. */
   attachment: z.object({ status: text, url: text.nullable(), fileName: text }).nullable(),
+  /** "Publish to Confluence" is active: the documents are published and the deck is not yet. */
+  canPublish: z.boolean(),
+  /** Why it is greyed out (documents not published, already published); a hint. */
+  lockedReason: text.nullable(),
 });
 export type Presentation = z.infer<typeof presentationSchema>;

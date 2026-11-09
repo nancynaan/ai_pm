@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { DeckDraft } from '../../agents/schemas.js';
 import type { SeedData } from '../../baseline/seed-data.js';
-import { deckFileName, deckToPptx } from '../../render/pptx.js';
 import { loadDocumentInputs } from '../documents/load.js';
 import type { DocumentRepository } from '../documents/repository.js';
 import { buildDeck, type DeckInputs, presenterPrompt } from '../presentation/deck.js';
@@ -19,26 +18,19 @@ export interface PresentationServices {
   /** Changes when the presenter's prompt or skills change, so the stored wording is redone. */
   presenterVersion: string;
   autoApprove: boolean;
-  /** Attaches the PPTX to the Feature Brief page (idempotent; dry-run aware). */
-  attach(input: {
-    runId: string;
-    pageId: string;
-    fileName: string;
-    data: Uint8Array;
-    contentHash: string;
-  }): Promise<{ status: string; url: string | null }>;
 }
 
 /** The deck's content without its timestamp: an unchanged deck is not uploaded again. */
-const contentHash = (deck: object) =>
+export const deckContentHash = (deck: object) =>
   createHash('sha256')
     .update(JSON.stringify({ ...deck, createdAt: undefined }))
     .digest('hex');
 
 /**
  * BPMN 05: the three-slide client deck and the decision gate. One presenter call words the
- * slides (reused while the assessment is unchanged); code fills every number. The PPTX goes to
- * the Feature Brief in Confluence; then the client decides (or auto-approve moves on).
+ * slides (reused while the assessment is unchanged); code fills every number. Publishing the
+ * PPTX to the Feature Brief is optional and the client's own action; the client decides at once
+ * (or auto-approve moves on).
  */
 export function presentingStage(
   services: StageServices & { presentation: PresentationServices },
@@ -82,25 +74,8 @@ export function presentingStage(
     const deck = buildDeck(inputs, draft, version, new Date());
     await p.repo.save(run.id, { version, inputHash, draft, deck });
 
-    // The PPTX goes to the Feature Brief once the documents are in Confluence.
-    const brief = (await p.documents.documentsOf(run.id)).find((d) => d.type === 'feature_brief');
-    const attachment = brief?.confluencePageId
-      ? await p.attach({
-          runId: run.id,
-          pageId: brief.confluencePageId,
-          fileName: deckFileName(deck, set?.faNumber ?? null),
-          data: await deckToPptx(deck),
-          contentHash: contentHash(deck),
-        })
-      : { status: 'skipped', url: null };
-    await p.repo.setAttachment(run.id, attachment.status, attachment.url);
-
-    if (alreadyShown) {
-      return {
-        next: 'awaiting_decision',
-        output: { version, attachment: attachment.status, unchanged: true },
-      };
-    }
+    // The PPTX goes to Confluence only when the client publishes it (publishing.ts).
+    if (alreadyShown) return { next: 'awaiting_decision', output: { version, unchanged: true } };
     // One presentation card and one decision card per run: a new deck rewrites them in place.
     await ctx.emit({ type: 'presentation_ready', version, label: deck.label }, 'presentation');
     const assessment = inputs.assessment;
@@ -125,8 +100,8 @@ export function presentingStage(
     );
     if (p.autoApprove) {
       await ctx.repo.saveDecision(run.id, 'approve', 'Auto-approved (CLIENT_GATE_AUTO_APPROVE is on)');
-      return { next: 'backlog', output: { version, attachment: attachment.status, autoApproved: true } };
+      return { next: 'backlog', output: { version, autoApproved: true } };
     }
-    return { next: 'awaiting_decision', output: { version, attachment: attachment.status } };
+    return { next: 'awaiting_decision', output: { version } };
   };
 }

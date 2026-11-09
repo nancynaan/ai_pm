@@ -4,6 +4,7 @@ import { UsageLimitReached } from '../agents/runner.js';
 import { InvalidSubmission, validateSubmission } from './discovery.js';
 import type { EventBus } from './events.js';
 import type { StageQueue, StageJob } from './queue.js';
+import type { Publishing } from './publishing.js';
 import type { RunRecord, RunRepository } from './repository.js';
 import { ACTIVE_STATES, assertTransition, isActive, stateAfterDecision } from './stages.js';
 
@@ -53,6 +54,16 @@ export interface PipelineEngineOptions {
    * Confluence, closing a declined Epic). Its message goes to the chat; a failure only logs.
    */
   onDecision?: (run: RunRecord, decision: Decision['decision']) => Promise<string | null>;
+  /**
+   * The client's optional "Publish to Confluence" actions (documents, then the deck); they run
+   * outside the stage flow and never move the run. Absent: publishing is refused.
+   */
+  publishing?: Pick<Publishing, 'documents' | 'presentation'>;
+  /**
+   * Where the run's documents stand. Generating is offered once; Approve needs them published
+   * (the client may skip them earlier, but not approve without them).
+   */
+  documentsStatus?: (runId: string) => Promise<{ generated: boolean; published: boolean }>;
 }
 
 const titleOf = (description: string) => {
@@ -250,6 +261,15 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
       const decided = await act(runId, async (run) => {
         if (run.state !== 'awaiting_decision')
           throw new RunActionError(`The run is ${run.state}, not waiting for a decision`, 409);
+        // Approve needs the documents in Confluence; the client is told what is missing.
+        const docs = decision === 'approve' ? await opts.documentsStatus?.(run.id) : undefined;
+        if (docs && !docs.published) {
+          const text = docs.generated
+            ? 'Please publish the documents to Confluence before you approve the feature: press Publish to Confluence on the Documents card (also on the Documents tab). Approve unlocks once they are published.'
+            : 'Please generate and publish the documents before you approve the feature: press Generate documents, then Publish to Confluence on the Documents card (also on the Documents tab). Approve unlocks once they are published.';
+          await bus.publish(run.id, { type: 'message', role: 'ai', text }, 'decision.blocked');
+          throw new RunActionError(text, 409);
+        }
         await repo.saveDecision(run.id, decision, comment);
         const label = { approve: 'Approve', decline: 'Decline' }[decision];
         await bus.publish(
@@ -284,24 +304,73 @@ export function createPipelineEngine(opts: PipelineEngineOptions) {
     },
 
     /**
-     * The client's "Publish documents" button: after the assessment, or again from the decision
-     * step (a re-publish rewrites the same pages). The documents stage runs as a normal job.
+     * The client's "Generate documents" button after the assessment. The documents stage runs
+     * as a normal job, then the run goes on to the presentation; publishing is separate.
      */
-    async publishDocuments(runId: string) {
+    async generateDocuments(runId: string) {
       return act(runId, async (run) => {
-        if (run.state !== 'awaiting_documents' && run.state !== 'awaiting_decision')
-          throw new RunActionError(
-            `The run is ${run.state}; documents can be published once the assessment is ready and until the decision`,
-            409,
-          );
+        // At the documents step, or later at the decision when the client skipped them (Approve
+        // needs them). Generated once: there is no re-generation.
+        const late = run.state === 'awaiting_decision';
+        if (run.state !== 'awaiting_documents' && !late)
+          throw new RunActionError(`The run is ${run.state}; the documents can be generated at the documents step or before the decision`, 409);
+        if ((await opts.documentsStatus?.(run.id))?.generated)
+          throw new RunActionError('The documents are already generated', 409);
+        // A late request goes to the end of the chat, and the Documents card moves under it.
         await bus.publish(
           run.id,
-          { type: 'message', role: 'client', text: 'Generate the documents and publish them to Confluence' },
-          'documents.request',
+          { type: 'message', role: 'client', text: 'Generate the documents' },
+          late ? 'documents.request.late' : 'documents.request',
         );
         await repo.resetFailures(run.id, 'documenting');
         await moveTo(run, 'documenting');
       });
+    },
+
+    /**
+     * "Skip for now", for any verdict: straight to the presentation. Approve still needs the
+     * documents generated and published later.
+     */
+    async skipDocuments(runId: string) {
+      return act(runId, async (run) => {
+        if (run.state !== 'awaiting_documents')
+          throw new RunActionError(`The run is ${run.state}, not waiting for the documents`, 409);
+        await bus.publish(
+          run.id,
+          { type: 'message', role: 'client', text: 'Skip the documents for now' },
+          'documents.request',
+        );
+        await moveTo(run, 'presenting');
+      });
+    },
+
+    /** The Documents card's "Publish to Confluence": once, at any time after generating. */
+    async publishDocuments(runId: string) {
+      const run = await repo.getRun(runId);
+      if (!run) throw new RunActionError('Run not found', 404);
+      if (!opts.publishing) throw new RunActionError('Publishing to Confluence is not configured', 409);
+      const outcome = await opts.publishing.documents(run);
+      await bus.publish(
+        runId,
+        { type: 'documents', published: outcome.published, mode: outcome.mode },
+        'documents.status',
+      );
+      await bus.publish(runId, { type: 'message', role: 'ai', text: outcome.text }, 'documents.published');
+    },
+
+    /** The Proposal card's "Publish to Confluence": once, after the documents are published. */
+    async publishPresentation(runId: string) {
+      const run = await repo.getRun(runId);
+      if (!run) throw new RunActionError('Run not found', 404);
+      if (!opts.publishing) throw new RunActionError('Publishing to Confluence is not configured', 409);
+      const outcome = await opts.publishing.presentation(run);
+      // The cards reload on a documents event; the Proposal card shows the link.
+      await bus.publish(
+        runId,
+        { type: 'documents', published: outcome.published, mode: outcome.mode },
+        'presentation.status',
+      );
+      await bus.publish(runId, { type: 'message', role: 'ai', text: outcome.text }, 'presentation.published');
     },
 
     async retry(runId: string) {

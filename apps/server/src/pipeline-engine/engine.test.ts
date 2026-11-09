@@ -34,6 +34,7 @@ function setupEngine(
   options: {
     lockFree?: () => boolean;
     onDecision?: (run: RunRecord, decision: 'approve' | 'decline') => Promise<string | null>;
+    documentsStatus?: () => Promise<{ generated: boolean; published: boolean }>;
   } = {},
 ) {
   const runs = new Map<string, RunRecord>();
@@ -138,6 +139,7 @@ function setupEngine(
     log,
     retryDelaySeconds: 5,
     ...(options.onDecision ? { onDecision: options.onDecision } : {}),
+    ...(options.documentsStatus ? { documentsStatus: options.documentsStatus } : {}),
   });
   /** Runs queued jobs like the worker would, until none are left. */
   async function drain() {
@@ -175,7 +177,7 @@ describe('pipeline engine', () => {
     await h.drain();
     // The run waits for the client's "publish documents" button.
     expect(h.runs.get(run.id)!.state).toBe('awaiting_documents');
-    await h.pipelineEngine.publishDocuments(run.id);
+    await h.pipelineEngine.generateDocuments(run.id);
     await h.drain();
     expect(h.runs.get(run.id)!.state).toBe('awaiting_decision');
 
@@ -231,23 +233,65 @@ describe('pipeline engine', () => {
     });
     const run = await h.pipelineEngine.createRun('Auto-approved feature');
     h.runs.get(run.id)!.state = 'awaiting_documents';
-    await h.pipelineEngine.publishDocuments(run.id);
+    await h.pipelineEngine.generateDocuments(run.id);
     await h.drain();
     expect(h.runs.get(run.id)!.state).toBe('completed');
   });
 
-  it('publishes documents only after the assessment and until the decision, and re-publishes from the decision', async () => {
-    const h = setupEngine({ documenting: async () => ({ next: 'awaiting_decision' }) });
+  it('generates documents once, at the documents step or late at the decision', async () => {
+    const docs = { generated: false, published: false };
+    const h = setupEngine({ documenting: async () => ({ next: 'presenting' }) }, { documentsStatus: async () => docs });
     const run = await h.pipelineEngine.createRun('A feature with documents');
-    await expect(h.pipelineEngine.publishDocuments(run.id)).rejects.toThrow(/documents can be published/);
-    h.runs.get(run.id)!.state = 'awaiting_decision';
-    await h.pipelineEngine.publishDocuments(run.id);
+    await expect(h.pipelineEngine.generateDocuments(run.id)).rejects.toThrow(/documents step or before the decision/);
+    h.runs.get(run.id)!.state = 'awaiting_documents';
+    await h.pipelineEngine.generateDocuments(run.id);
     expect(h.runs.get(run.id)!.state).toBe('documenting');
-    await h.drain();
-    expect(h.runs.get(run.id)!.state).toBe('awaiting_decision');
     expect(canTransition('estimating', 'documenting')).toBe(false); // only the client's button leads in
-    expect(canTransition('awaiting_documents', 'documenting')).toBe(true);
+    expect(canTransition('documenting', 'presenting')).toBe(true);
+    // Skipped first, generated late at the decision, then back to the decision.
+    expect(canTransition('awaiting_decision', 'documenting')).toBe(true);
     expect(canTransition('documenting', 'awaiting_decision')).toBe(true);
+    h.runs.get(run.id)!.state = 'awaiting_decision';
+    docs.generated = true; // no re-generation
+    await expect(h.pipelineEngine.generateDocuments(run.id)).rejects.toThrow(/already generated/);
+    docs.generated = false;
+    await h.pipelineEngine.generateDocuments(run.id);
+    expect(h.runs.get(run.id)!.state).toBe('documenting');
+    // Publishing is a separate action and needs the publisher.
+    await expect(h.pipelineEngine.publishDocuments(run.id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('lets the client skip the documents for any verdict', async () => {
+    const h = setupEngine({});
+    const run = await h.pipelineEngine.createRun('A feature the client may skip');
+    await expect(h.pipelineEngine.skipDocuments(run.id)).rejects.toThrow(/not waiting for the documents/);
+    h.runs.get(run.id)!.state = 'awaiting_documents';
+    await h.pipelineEngine.skipDocuments(run.id);
+    expect(h.runs.get(run.id)!.state).toBe('presenting');
+    expect(h.events).toContainEqual(expect.objectContaining({ role: 'client', text: 'Skip the documents for now' }));
+  });
+
+  it('approves only once the documents are published, and says what is missing', async () => {
+    const docs = { generated: false, published: false };
+    const h = setupEngine({}, { documentsStatus: async () => docs });
+    const run = await h.pipelineEngine.createRun('A feature to approve');
+    h.runs.get(run.id)!.state = 'awaiting_decision';
+    await expect(h.pipelineEngine.decide(run.id, { decision: 'approve' })).rejects.toMatchObject({ status: 409 });
+    expect(h.events.at(-1)).toMatchObject({ role: 'ai', text: expect.stringMatching(/generate and publish/) });
+    docs.generated = true;
+    await expect(h.pipelineEngine.decide(run.id, { decision: 'approve' })).rejects.toThrow(/publish the documents/);
+    expect(h.runs.get(run.id)!.state).toBe('awaiting_decision');
+    docs.published = true;
+    await h.pipelineEngine.decide(run.id, { decision: 'approve' });
+    expect(h.runs.get(run.id)!.state).toBe('backlog');
+  });
+
+  it('declines without documents', async () => {
+    const h = setupEngine({}, { documentsStatus: async () => ({ generated: false, published: false }) });
+    const run = await h.pipelineEngine.createRun('A feature to decline');
+    h.runs.get(run.id)!.state = 'awaiting_decision';
+    await h.pipelineEngine.decide(run.id, { decision: 'decline' });
+    expect(h.runs.get(run.id)!.state).toBe('declined');
   });
 
   it('lets the client continue with a preliminary assessment, or stop, after an incomplete discovery', async () => {

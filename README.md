@@ -95,9 +95,9 @@ Open <http://localhost:3000>, describe a feature as the client and send it. The 
 
 1. asks a discovery questionnaire (and a clarification round if something is unclear or contradictory);
 2. analyzes and assesses the feature; the figures and charts are on the **Analysis** tab;
-3. waits for you to press **Generate and publish to Confluence** on the Documents card;
-4. shows a three-slide proposal (**Presentation** tab, PPTX attached to the Feature Brief);
-5. asks for your decision: **Approve** or **Decline**.
+3. waits for you to press **Generate documents** on the Documents card (or **Skip for now**, for any verdict), shows them with previews and moves on by itself; **Publish to Confluence** works once, at any time, and is needed to approve;
+4. shows a three-slide proposal (**Presentation** tab, PPTX download; publishing it to the Feature Brief is optional, once the documents are published);
+5. asks for your decision: **Approve** or **Decline**. Approve needs the documents published (the button is locked until then, and the chat says what is missing); Decline does not.
 
 On Approve, the Epic and one story per story-map item go to Jira as an AI draft for the Product Owner: To Do, label `ai-draft`, no sprint, Story Points empty, a proposed priority and an `AI estimate (SP)`. The Initial Product Backlog page gets the feature's block, and a **Backlog** tab appears. On Decline, the decision is recorded on the Feature Brief and the Assumption Log and the draft Epic is closed. Either way the conversation then closes.
 

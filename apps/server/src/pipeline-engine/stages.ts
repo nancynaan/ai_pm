@@ -22,10 +22,11 @@ const TRANSITIONS: Record<RunState, readonly RunState[]> = {
   eliciting: ['awaiting_answers', 'awaiting_confirmation', 'analyzing'],
   awaiting_confirmation: ['analyzing', 'declined'],
   analyzing: ['estimating'],
-  // The client publishes the documents with a button; the run waits for it.
+  // The client generates the documents with a button (or skips them after a doubtful verdict).
   estimating: ['awaiting_documents'],
-  awaiting_documents: ['documenting'],
-  // First publish → presentation; a re-publish from the decision step goes back to the decision.
+  awaiting_documents: ['documenting', 'presenting'],
+  // Generated (publishing is a separate action) → the presentation, or back to the decision when
+  // the client skipped them and generates them late (Approve needs them published).
   documenting: ['presenting', 'awaiting_decision'],
   presenting: ['awaiting_decision', 'backlog'],
   awaiting_decision: ['backlog', 'declined', 'documenting'],
