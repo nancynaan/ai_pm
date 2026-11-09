@@ -1,5 +1,7 @@
 # AI PM pipeline
 
+> **Using the app as a client?** Read the [user guide](USER_GUIDE.md). This README is for whoever sets up and runs the app.
+
 An AI pipeline that does project-management work for a Scrum game project (an endless runner). A client describes a new feature in a chat UI, and the pipeline:
 
 1. asks a short questionnaire with predefined answers;
